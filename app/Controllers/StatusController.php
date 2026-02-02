@@ -88,7 +88,7 @@ class StatusController
         </div>
 
         <div class="footer">
-            © Academic Projects API
+            © School Management System API
         </div>
     </div>
 </body>
