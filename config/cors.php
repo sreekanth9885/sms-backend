@@ -2,7 +2,8 @@
 
 $allowedOrigins = [
     "http://localhost:5173",
-    "https://sms.academicprojects.org"
+    "https://sms.academicprojects.org",
+    "http://localhost:8000",
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
