@@ -8,8 +8,9 @@ $allowedOrigins = [
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-if (in_array($origin, $allowedOrigins)) {
+if ($origin && in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
+    header("Vary: Origin");
 }
 
 header("Access-Control-Allow-Credentials: true");
