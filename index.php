@@ -25,6 +25,6 @@ $statusController = new StatusController();
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/users', [$userController, 'index']);
 $router->get('/status', [$statusController, 'index']);
-
+$router->post('/auth/logout', [$authController, 'logout']);
 
 $router->dispatch();
