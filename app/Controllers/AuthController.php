@@ -52,7 +52,9 @@ class AuthController
             "access_token" =>$accessToken,
             "user" => [
                 "id" => $user['id'],
-                "role" => $user['role']
+                "role" => $user['role'],
+                "name" => $user['name'],
+                "email" => $user['email']
             ]
         ]);
     }
