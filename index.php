@@ -14,17 +14,21 @@ require_once __DIR__ . '/app/Core/Router.php';
 require_once __DIR__ . '/app/Controllers/AuthController.php';
 require_once __DIR__ . '/app/Controllers/UserController.php';
 require_once __DIR__ . '/app/Controllers/StatusController.php';
+require_once __DIR__ . '/app/Controllers/SchoolController.php';
 
 $router = new Router();
 
 $authController = new AuthController($pdo);
 $userController = new UserController($pdo);
 $statusController = new StatusController();
-
+$schoolController = new SchoolController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/users', [$userController, 'index']);
 $router->get('/status', [$statusController, 'index']);
 $router->post('/auth/logout', [$authController, 'logout']);
+$router->post('/auth/force-reset-password', [$authController, 'forceResetPassword']);
+$router->post('/schools', [$schoolController, 'create']);
+
 
 $router->dispatch();
