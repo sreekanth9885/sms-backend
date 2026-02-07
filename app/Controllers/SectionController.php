@@ -1,0 +1,34 @@
+<?php
+require_once __DIR__ . '/../Models/SectionModel.php';
+require_once __DIR__ . '/../Helpers/JwtHelper.php';
+class SectionController
+{
+    private SectionModel $section;
+
+    public function __construct(PDO $db)
+    {
+        $this->section = new SectionModel($db);
+    }
+
+    public function create()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if ($user['role'] !== 'ADMIN') {
+            Response::json(["message" => "Forbidden"], 403);
+        }
+
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['class_id']) || empty($data['name'])) {
+            Response::json(["message" => "Invalid data"], 422);
+        }
+
+        $id = $this->section->create($data['class_id'], $data['name']);
+
+        Response::json([
+            "message" => "Section created",
+            "section_id" => $id
+        ], 201);
+    }
+}

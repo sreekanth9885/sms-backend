@@ -34,7 +34,8 @@ class AuthController
         // ✅ Generate tokens via JwtHelper (config-driven)
         $accessToken = JwtHelper::generateAccessToken([
             "uid" => $user['id'],
-            "role" => $user['role']
+            "role" => $user['role'],
+            "school_id" => $user['school_id'] // Add school context to token
         ]);
 
         $refreshToken = JwtHelper::generateRefreshToken([
@@ -62,7 +63,13 @@ class AuthController
                 "name"  => $user['name'],
                 "email" => $user['email'],
                 "role"  => $user['role'],
-                "must_reset_password" => (bool)$user['must_reset_password']
+                "must_reset_password" => (bool)$user['must_reset_password'],
+                // ✅ SCHOOL CONTEXT (NULL for SUPER_ADMIN)
+        "school" => $user['school_id'] ? [
+            "id"   => $user['school_id'],
+            "name" => $user['school_name'],
+            "code" => $user['school_code']
+        ] : null
             ]
         ]);
     }

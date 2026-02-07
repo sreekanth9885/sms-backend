@@ -12,7 +12,15 @@ class User
     public function findByEmail(string $email)
     {
         $stmt = $this->db->prepare(
-            "SELECT * FROM users WHERE email = ? AND is_active = 1"
+            "SELECT
+            u.*,
+            s.id   AS school_id,
+            s.name AS school_name,
+            s.code AS school_code
+        FROM users u
+        LEFT JOIN schools s ON s.id = u.school_id
+        WHERE u.email = ? AND u.is_active = 1
+        LIMIT 1"
         );
         $stmt->execute([$email]);
         return $stmt->fetch();
