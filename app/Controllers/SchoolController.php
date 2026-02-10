@@ -51,7 +51,7 @@ class SchoolController
         $this->db->beginTransaction();
 
         // 1️⃣ Create school
-        $schoolId = $this->school->create($data, $user['uid']);
+        $schoolId = $this->school->create($data, $user['id']);
 
         // 2️⃣ Generate ADMIN password ONCE
         $tempPassword = bin2hex(random_bytes(4));

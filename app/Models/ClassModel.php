@@ -66,5 +66,11 @@ class ClassModel
 
         return array_values($classes);
     }
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare("DELETE FROM classes WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
 }
 ?>

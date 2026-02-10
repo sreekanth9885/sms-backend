@@ -33,14 +33,16 @@ class AuthController
 
         // ✅ Generate tokens via JwtHelper (config-driven)
         $accessToken = JwtHelper::generateAccessToken([
-            "uid" => $user['id'],
+            "id" => $user['id'],
             "role" => $user['role'],
             "school_id" => $user['school_id'] // Add school context to token
         ]);
 
         $refreshToken = JwtHelper::generateRefreshToken([
-            "uid" => $user['id']
-        ]);
+    "id" => $user['id'],
+    "role" => $user['role'],
+    "school_id" => $user['school_id']
+]);
 
         // ✅ Refresh token cookie (env-aware)
         setcookie(
@@ -111,9 +113,35 @@ class AuthController
         WHERE id = ?
     ");
 
-    $stmt->execute([$hashed, $user['uid']]);
+    $stmt->execute([$hashed, $user['id']]);
 
     Response::json(["message" => "Password updated successfully"]);
 }
+public function refresh()
+{
+    if (!isset($_COOKIE['refresh_token'])) {
+        Response::json(["message" => "Refresh token missing"], 401);
+    }
+
+    $refreshToken = $_COOKIE['refresh_token'];
+
+    $payload = JwtHelper::verify($refreshToken);
+
+    if (($payload['type'] ?? '') !== 'refresh') {
+        Response::json(["message" => "Invalid refresh token"], 401);
+    }
+
+    // Issue NEW access token
+    $accessToken = JwtHelper::generateAccessToken([
+        "id" => $payload['id'],
+        "role" => $payload['role'],
+        "school_id" => $payload['school_id']
+    ]);
+
+    Response::json([
+        "access_token" => $accessToken
+    ]);
+}
+
 
 }

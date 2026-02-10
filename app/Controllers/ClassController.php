@@ -50,4 +50,21 @@ class ClassController
 
     Response::json($classes);
 }
+public function delete($id)
+{
+    $user = JwtHelper::getUserFromToken();
+
+    if ($user['role'] !== 'ADMIN') {
+        Response::json(["message" => "Forbidden"], 403);
+    }
+    if(!$id) {
+        Response::json(["message" => "Class ID required"], 422);
+    }
+    $deleted = $this->classModel->delete((int)$id);
+    if (!$deleted) {
+        Response::json(["message" => "Class not found"], 404);
+    }
+    
+    Response::json(["message" => "Class deleted"]);
+}
 }

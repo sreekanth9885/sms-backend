@@ -31,4 +31,26 @@ class SectionController
             "section_id" => $id
         ], 201);
     }
+    /* ---------- Delete ---------- */
+
+    public function delete($id)
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if ($user['role'] !== 'ADMIN') {
+            Response::json(["message" => "Forbidden"], 403);
+        }
+
+        if (!$id) {
+            Response::json(["message" => "Section ID required"], 422);
+        }
+
+        $deleted = $this->section->delete((int)$id);
+
+        if (!$deleted) {
+            Response::json(["message" => "Section not found"], 404);
+        }
+
+        Response::json(["message" => "Section deleted"]);
+    }
 }
