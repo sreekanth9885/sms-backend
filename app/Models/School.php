@@ -11,6 +11,9 @@ class School
 
     public function create(array $data, int $createdBy): int
     {
+        if ($this->emailExist($data['contact_email'])) {
+            Response::json(["message" => "This email is already registered. Please use a different email address."], 422);
+        }
         $stmt = $this->db->prepare("
             INSERT INTO schools (
               name, tagline, code, address, latitude, longitude,
@@ -68,5 +71,22 @@ class School
             $schoolId
         ]);
     }
+    public function all(): array
+    {
+        try {
+            $stmt = $this->db->query("SELECT * FROM schools");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            Response::json([
+                "message" => "Failed to fetch schools",
+                "error" => $e->getMessage()
+            ], 500);
+        }
+    }
+    private function emailExist(string $email): bool
+    {
+        $stmt = $this->db->prepare("SELECT id FROM schools WHERE contact_email = ?");
+        $stmt->execute([$email]);
+        return $stmt->rowCount() > 0;
+    }
 }
-

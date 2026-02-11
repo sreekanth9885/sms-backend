@@ -30,19 +30,28 @@ $sectionController = new SectionController($pdo);
 $studentController = new StudentController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
-$router->get('/users', [$userController, 'index']);
-$router->get('/status', [$statusController, 'index']);
+$router->get('/auth/me', [$authController, 'me']);
 $router->post('/auth/logout', [$authController, 'logout']);
 $router->post('/auth/force-reset-password', [$authController, 'forceResetPassword']);
+$router->post('/auth/refresh', [$authController, 'refresh']);
+
+$router->get('/users', [$userController, 'index']);
+
+$router->get('/status', [$statusController, 'index']);
+
 $router->post('/schools', [$schoolController, 'create']);
-$router->post('/classes', [$classController, 'create']);
+$router->get('/schools', [$schoolController, 'index']);
+
 $router->get('/classes', [$classController, 'index']);
+$router->post('/classes', [$classController, 'create']);
+$router->delete('/classes/{id}', [$classController, 'delete']);
+
 $router->get('/sections', [$sectionController, 'index']);
 $router->post('/sections', [$sectionController, 'create']);
 $router->delete('/sections/{id}', [$sectionController, 'delete']);
-$router->delete('/classes/{id}', [$classController, 'delete']);
-$router->post('/auth/refresh', [$authController, 'refresh']);
-$router->post('/students', [$studentController, 'register']);
+
 $router->get('/students', [$studentController, 'index']);
+$router->post('/students', [$studentController, 'register']);
+
 
 $router->dispatch();

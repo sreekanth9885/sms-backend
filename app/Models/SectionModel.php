@@ -39,4 +39,3 @@ class SectionModel
         return $stmt->rowCount() > 0;
     }
 }
-?>
