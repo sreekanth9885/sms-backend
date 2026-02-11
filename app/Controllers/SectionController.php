@@ -53,4 +53,23 @@ class SectionController
 
         Response::json(["message" => "Section deleted"]);
     }
+    public function index()
+{
+    $user = JwtHelper::getUserFromToken();
+
+    if (!isset($user['school_id'])) {
+        Response::json(["message" => "School context missing"], 403);
+    }
+
+    if (!isset($_GET['class_id'])) {
+        Response::json(["message" => "class_id required"], 422);
+    }
+
+    $classId = (int)$_GET['class_id'];
+
+    $sections = $this->section->allByClass($classId);
+
+    Response::json($sections);
+}
+
 }

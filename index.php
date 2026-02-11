@@ -37,6 +37,7 @@ $router->post('/auth/force-reset-password', [$authController, 'forceResetPasswor
 $router->post('/schools', [$schoolController, 'create']);
 $router->post('/classes', [$classController, 'create']);
 $router->get('/classes', [$classController, 'index']);
+$router->get('/sections', [$sectionController, 'index']);
 $router->post('/sections', [$sectionController, 'create']);
 $router->delete('/sections/{id}', [$sectionController, 'delete']);
 $router->delete('/classes/{id}', [$classController, 'delete']);
