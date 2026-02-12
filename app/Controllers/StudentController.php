@@ -79,14 +79,64 @@ class StudentController
     {
         $user = JwtHelper::getUserFromToken();
 
-        if (!isset($user['school_id'])) {
-            Response::json(["message" => "School context missing"], 403);
-        }
+        $filters = [
+            'class_id' => $_GET['class_id'] ?? null,
+            'section_id' => $_GET['section_id'] ?? null,
+            'search' => $_GET['search'] ?? null,
+        ];
 
         $students = $this->studentModel->allBySchool(
-            (int)$user['school_id']
+            (int)$user['school_id'],
+            $filters
         );
 
         Response::json($students);
+    }
+    public function show($id)
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        $student = $this->studentModel->findById(
+            (int)$id,
+            (int)$user['school_id']
+        );
+
+        if (!$student) {
+            Response::json(["message" => "Student not found"], 404);
+        }
+
+        Response::json($student);
+    }
+    public function update($id)
+    {
+        $user = JwtHelper::getUserFromToken();
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        $updated = $this->studentModel->update(
+            (int)$id,
+            (int)$user['school_id'],
+            $data
+        );
+
+        if (!$updated) {
+            Response::json(["message" => "Update failed"], 400);
+        }
+
+        Response::json(["message" => "Student updated successfully"]);
+    }
+    public function delete($id)
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        $deleted = $this->studentModel->delete(
+            (int)$id,
+            (int)$user['school_id']
+        );
+
+        if (!$deleted) {
+            Response::json(["message" => "Delete failed"], 400);
+        }
+
+        Response::json(["message" => "Student deleted successfully"]);
     }
 }

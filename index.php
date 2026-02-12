@@ -53,6 +53,9 @@ $router->delete('/sections/{id}', [$sectionController, 'delete']);
 
 $router->get('/students', [$studentController, 'index']);
 $router->post('/students', [$studentController, 'register']);
+$router->get('/students/{id}', [$studentController, 'show']);
+$router->put('/students/{id}', [$studentController, 'update']);
+$router->delete('/students/{id}', [$studentController, 'delete']);
 
 
 $router->dispatch();
