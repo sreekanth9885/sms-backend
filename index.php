@@ -41,6 +41,7 @@ $router->get('/status', [$statusController, 'index']);
 
 $router->post('/schools', [$schoolController, 'create']);
 $router->get('/schools', [$schoolController, 'index']);
+$router->delete('/schools/{id}', [$schoolController, 'delete']);
 
 $router->get('/classes', [$classController, 'index']);
 $router->post('/classes', [$classController, 'create']);

@@ -89,4 +89,24 @@ class SchoolController
         $schools = $this->school->all();
         Response::json($schools);
     }
+    public function delete($id)
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if ($user['role'] !== 'SUPER_ADMIN') {
+            Response::json(["message" => "Forbidden"], 403);
+        }
+
+        if (!$id) {
+            Response::json(["message" => "Section ID required"], 422);
+        }
+
+        $deleted = $this->school->delete((int)$id);
+
+        if (!$deleted) {
+            Response::json(["message" => "Section not found"], 404);
+        }
+
+        Response::json(["message" => "School deleted"]);
+    }
 }

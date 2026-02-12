@@ -89,4 +89,13 @@ class School
         $stmt->execute([$email]);
         return $stmt->rowCount() > 0;
     }
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare(
+            "DELETE FROM schools WHERE id = ?"
+        );
+        $stmt->execute([$id]);
+
+        return $stmt->rowCount() > 0;
+    }
 }
