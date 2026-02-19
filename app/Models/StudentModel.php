@@ -90,19 +90,16 @@ class StudentModel
     {
         $sql = "
         SELECT
-            st.id,
-            st.admission_number,
-            st.roll_number,
-            CONCAT(st.first_name,' ',st.last_name) AS student_name,
-            st.gender,
-            c.name AS class_name,
-            s.name AS section_name,
-            st.is_active
-        FROM students st
-        JOIN classes c ON c.id = st.class_id
-        JOIN sections s ON s.id = st.section_id
-        WHERE st.school_id = ?
-        AND st.is_active = 1
+    st.*,
+    CONCAT(st.first_name,' ',st.last_name) AS student_name,
+    c.name AS class_name,
+    s.name AS section_name
+    FROM students st
+    JOIN classes c ON c.id = st.class_id
+    JOIN sections s ON s.id = st.section_id
+    WHERE st.school_id = ?
+    AND st.is_active = 1;
+
     ";
 
         $params = [$schoolId];
