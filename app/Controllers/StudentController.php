@@ -57,7 +57,7 @@ class StudentController
             }
 
             // public URL (adjust domain if needed)
-            $photoUrl = "/uploads/students/" . $fileName;
+            $photoUrl = "app/uploads/students/" . $fileName;
         }
         /* ---------- REQUIRED CHECK ---------- */
 
