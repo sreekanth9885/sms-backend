@@ -126,6 +126,7 @@ class StudentController
 
         Response::json($students);
     }
+
     public function show($id)
     {
         $user = JwtHelper::getUserFromToken();
@@ -141,17 +142,27 @@ class StudentController
 
         Response::json($student);
     }
+
     public function update($id)
     {
         $user = JwtHelper::getUserFromToken();
-        $data = $_POST;
+
+        // Debug log
+        error_log('Content-Type: ' . ($_SERVER['CONTENT_TYPE'] ?? 'none'));
+
+        // Parse the multipart data - merge with $_POST as fallback
+        $parsedData = $this->parseMultipartData();
+        $data = array_merge($_POST, $parsedData);
+
+        // Debug log parsed data
+        error_log('Parsed data: ' . print_r($parsedData, true));
+        error_log('$_POST data: ' . print_r($_POST, true));
+        error_log('Merged data: ' . print_r($data, true));
+        error_log('Files: ' . print_r($_FILES, true));
 
         /* ---------- FILE UPLOAD ---------- */
-
-        $photoUrl = $data['photo_url'] ?? null;
-
+        // Only update photo if a new one is uploaded
         if (!empty($_FILES['pic']['name'])) {
-
             $file = $_FILES['pic'];
 
             if ($file['size'] > 2 * 1024 * 1024) {
@@ -179,22 +190,44 @@ class StudentController
                 Response::json(["message" => "Failed to upload image"], 500);
             }
 
-            $photoUrl = "/uploads/students/" . $fileName;
+            // Update photo_url with new file
+            $data['photo_url'] = "app/uploads/students/" . $fileName;
+        }
+        // If no new photo and photo_url is not in data, keep existing (don't set to null)
+        else if (!isset($data['photo_url'])) {
+            // Fetch existing student to keep current photo
+            $existingStudent = $this->studentModel->findById((int)$id, (int)$user['school_id']);
+            if ($existingStudent && !empty($existingStudent['photo_url'])) {
+                $data['photo_url'] = $existingStudent['photo_url'];
+            }
         }
 
-        $data['photo_url'] = $photoUrl;
-
         /* ---------- REQUIRED CHECK ---------- */
-
         $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
 
         foreach ($required as $field) {
-            if (!array_key_exists($field, $data)) {
-                Response::json(["message" => "$field missing"], 422);
+            if (!isset($data[$field]) || $data[$field] === '') {
+                error_log("Missing required field: $field");
+                Response::json([
+                    "message" => "$field is required",
+                    "debug" => [
+                        "field" => $field,
+                        "received_data" => $data
+                    ]
+                ], 422);
             }
         }
 
         /* ---------- UPDATE ---------- */
+        // Cast numeric fields to integers
+        $data['class_id'] = (int)$data['class_id'];
+        $data['section_id'] = (int)$data['section_id'];
+        $data['school_id'] = (int)$user['school_id'];
+
+        // Remove any fields that shouldn't be updated
+        unset($data['id']); // Don't try to update the ID
+        unset($data['created_at']); // Keep original creation date
+        unset($data['created_by']); // Keep original creator
 
         $updated = $this->studentModel->update(
             (int)$id,
@@ -208,6 +241,7 @@ class StudentController
 
         Response::json(["message" => "Student updated successfully"]);
     }
+
     public function delete($id)
     {
         $user = JwtHelper::getUserFromToken();
@@ -222,5 +256,53 @@ class StudentController
         }
 
         Response::json(["message" => "Student deleted successfully"]);
+    }
+
+    /**
+     * Parse multipart/form-data from php://input
+     */
+    private function parseMultipartData(): array
+    {
+        $data = [];
+        $rawInput = file_get_contents('php://input');
+
+        // Get the boundary
+        if (preg_match('/boundary=(.*)$/', $_SERVER['CONTENT_TYPE'] ?? '', $matches)) {
+            $boundary = $matches[1];
+        } else {
+            return $_POST; // Fallback to $_POST if no boundary found
+        }
+
+        // Split by boundary
+        $parts = explode('--' . $boundary, $rawInput);
+
+        foreach ($parts as $part) {
+            // Skip empty parts and the closing boundary
+            if (trim($part) === '' || trim($part) === '--') {
+                continue;
+            }
+
+            // Check if this part contains a name
+            if (preg_match('/name="([^"]+)"/', $part, $nameMatch)) {
+                $fieldName = $nameMatch[1];
+
+                // Skip file uploads in text parsing (they are handled by $_FILES)
+                if (strpos($part, 'filename="') !== false) {
+                    continue;
+                }
+
+                // Extract the value (after the blank line)
+                if (preg_match('/\r\n\r\n(.*)\r\n$/', $part, $valueMatch)) {
+                    $data[$fieldName] = trim($valueMatch[1]);
+                } else {
+                    // Try alternative pattern for last part without trailing newline
+                    if (preg_match('/\r\n\r\n(.*)$/', $part, $valueMatch)) {
+                        $data[$fieldName] = trim($valueMatch[1]);
+                    }
+                }
+            }
+        }
+
+        return $data;
     }
 }
