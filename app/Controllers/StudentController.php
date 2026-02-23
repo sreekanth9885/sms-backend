@@ -19,15 +19,49 @@ class StudentController
             Response::json(["message" => "School context missing"], 403);
         }
 
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = $_POST;
 
-        // Required fields
-        $required = [
-            'class_id',
-            'section_id',
-            'admission_number',
-            'first_name'
-        ];
+        /* ---------- FILE UPLOAD ---------- */
+
+        $photoUrl = null;
+
+        if (!empty($_FILES['pic']['name'])) {
+
+            $file = $_FILES['pic'];
+
+            // validate size (2MB max)
+            if ($file['size'] > 2 * 1024 * 1024) {
+                Response::json(["message" => "Image must be less than 2MB"], 422);
+            }
+
+            // validate type
+            $allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+            if (!in_array($file['type'], $allowed)) {
+                Response::json(["message" => "Invalid image type"], 422);
+            }
+
+            // create folder if not exists
+            $uploadDir = __DIR__ . "/../../app/uploads/students/";
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            // unique filename
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $fileName = uniqid("student_") . "." . $ext;
+
+            $destination = $uploadDir . $fileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                Response::json(["message" => "Failed to upload image"], 500);
+            }
+
+            // public URL (adjust domain if needed)
+            $photoUrl = "/uploads/students/" . $fileName;
+        }
+        /* ---------- REQUIRED CHECK ---------- */
+
+        $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
 
         foreach ($required as $field) {
             if (empty($data[$field])) {
@@ -65,7 +99,7 @@ class StudentController
             'complete_address'        => $data['complete_address'] ?? null,
             'identification_mark_1'   => $data['identification_mark_1'] ?? null,
             'identification_mark_2'   => $data['identification_mark_2'] ?? null,
-            'photo_url'               => $data['photo_url'] ?? null,
+            'photo_url'               => $photoUrl,
             'created_by'              => (int)$user['id']
         ]);
 
@@ -110,7 +144,57 @@ class StudentController
     public function update($id)
     {
         $user = JwtHelper::getUserFromToken();
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = $_POST;
+
+        /* ---------- FILE UPLOAD ---------- */
+
+        $photoUrl = $data['photo_url'] ?? null;
+
+        if (!empty($_FILES['pic']['name'])) {
+
+            $file = $_FILES['pic'];
+
+            if ($file['size'] > 2 * 1024 * 1024) {
+                Response::json(["message" => "Image must be less than 2MB"], 422);
+            }
+
+            $allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+
+            if (!in_array($file['type'], $allowed)) {
+                Response::json(["message" => "Invalid image type"], 422);
+            }
+
+            $uploadDir = __DIR__ . "/../../app/uploads/students/";
+
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $fileName = uniqid("student_") . "." . $ext;
+
+            $destination = $uploadDir . $fileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destination)) {
+                Response::json(["message" => "Failed to upload image"], 500);
+            }
+
+            $photoUrl = "/uploads/students/" . $fileName;
+        }
+
+        $data['photo_url'] = $photoUrl;
+
+        /* ---------- REQUIRED CHECK ---------- */
+
+        $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
+
+        foreach ($required as $field) {
+            if (!array_key_exists($field, $data)) {
+                Response::json(["message" => "$field missing"], 422);
+            }
+        }
+
+        /* ---------- UPDATE ---------- */
 
         $updated = $this->studentModel->update(
             (int)$id,
