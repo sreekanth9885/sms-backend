@@ -47,6 +47,8 @@ $router->get('/status', [$statusController, 'index']);
 
 $router->post('/schools', [$schoolController, 'create']);
 $router->get('/schools', [$schoolController, 'index']);
+$router->get('/schools/{id}', [$schoolController, 'get']);
+$router->post('/schools/{id}', [$schoolController, 'update']);
 $router->delete('/schools/{id}', [$schoolController, 'delete']);
 
 $router->get('/classes', [$classController, 'index']);
