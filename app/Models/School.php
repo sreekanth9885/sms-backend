@@ -14,6 +14,7 @@ class School
         if ($this->emailExist($data['contact_email'])) {
             Response::json(["message" => "This email is already registered. Please use a different email address."], 422);
         }
+
         $stmt = $this->db->prepare("
             INSERT INTO schools (
               name, tagline, code, address, latitude, longitude,
@@ -46,6 +47,46 @@ class School
         return (int) $this->db->lastInsertId();
     }
 
+    public function update(int $id, array $data): bool
+    {
+        $fields = [];
+        $values = [];
+
+        $allowedFields = [
+            'name',
+            'tagline',
+            'address',
+            'latitude',
+            'longitude',
+            'contact_name',
+            'contact_designation',
+            'contact_email',
+            'contact_phone_primary',
+            'contact_phone_secondary',
+            'board',
+            'established_date',
+            'website',
+            'logo_url'
+        ];
+
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $fields[] = "$field = ?";
+                $values[] = $data[$field];
+            }
+        }
+
+        if (empty($fields)) {
+            return false;
+        }
+
+        $values[] = $id;
+        $sql = "UPDATE schools SET " . implode(', ', $fields) . ", updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($values);
+    }
+
     public function createAdmin(
         int $schoolId,
         string $name,
@@ -71,10 +112,11 @@ class School
             $schoolId
         ]);
     }
+
     public function all(): array
     {
         try {
-            $stmt = $this->db->query("SELECT * FROM schools");
+            $stmt = $this->db->query("SELECT * FROM schools ORDER BY created_at DESC");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             Response::json([
@@ -83,19 +125,39 @@ class School
             ], 500);
         }
     }
-    private function emailExist(string $email): bool
+
+    public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT id FROM schools WHERE contact_email = ?");
-        $stmt->execute([$email]);
+        $stmt = $this->db->prepare("SELECT * FROM schools WHERE id = ?");
+        $stmt->execute([$id]);
+        $school = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $school ?: null;
+    }
+
+    private function emailExist(string $email, ?int $excludeId = null): bool
+    {
+        $sql = "SELECT id FROM schools WHERE contact_email = ?";
+        $params = [$email];
+
+        if ($excludeId) {
+            $sql .= " AND id != ?";
+            $params[] = $excludeId;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->rowCount() > 0;
     }
+
+    public function emailExistsForOther(string $email, int $excludeId): bool
+    {
+        return $this->emailExist($email, $excludeId);
+    }
+
     public function delete(int $id): bool
     {
-        $stmt = $this->db->prepare(
-            "DELETE FROM schools WHERE id = ?"
-        );
+        $stmt = $this->db->prepare("DELETE FROM schools WHERE id = ?");
         $stmt->execute([$id]);
-
         return $stmt->rowCount() > 0;
     }
 }

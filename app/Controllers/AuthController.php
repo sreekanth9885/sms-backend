@@ -70,7 +70,8 @@ class AuthController
                 "school" => $user['school_id'] ? [
                     "id"   => $user['school_id'],
                     "name" => $user['school_name'],
-                    "code" => $user['school_code']
+                    "code" => $user['school_code'],
+                    "logo_url" => $user['school_logo_url']
                 ] : null
             ]
         ]);
@@ -150,7 +151,7 @@ class AuthController
             // Fetch fresh user data (including school context)
             $stmt = $this->db->prepare("
                 SELECT u.id, u.name, u.email, u.role, u.must_reset_password,
-                       s.id AS school_id, s.name AS school_name, s.code AS school_code
+                       s.id AS school_id, s.name AS school_name, s.code AS school_code, s.logo_url AS school_logo_url
                 FROM users u
                 LEFT JOIN schools s ON u.school_id = s.id
                 WHERE u.id = ?
@@ -171,7 +172,8 @@ class AuthController
                 "school" => $userData['school_id'] ? [
                     "id"   => $userData['school_id'],
                     "name" => $userData['school_name'],
-                    "code" => $userData['school_code']
+                    "code" => $userData['school_code'],
+                    "logo_url" => $userData['school_logo_url']
                 ] : null
             ]);
         } catch (Exception $e) {
