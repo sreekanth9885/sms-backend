@@ -68,7 +68,7 @@ $router->delete('/students/{id}', [$studentController, 'delete']);
 $router->get('/teachers', [$teacherController, 'index']);
 $router->post('/teachers', [$teacherController, 'create']);
 $router->get('/teachers/{id}', [$teacherController, 'show']);
-$router->put('/teachers/{id}', [$teacherController, 'update']);
+$router->post('/teachers/{id}', [$teacherController, 'update']);
 $router->delete('/teachers/{id}', [$teacherController, 'delete']);
 
 /* Fee Types */
