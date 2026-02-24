@@ -31,7 +31,7 @@ class ClassController
         );
 
         Response::json([
-            "message" => "Class created",
+            "message" => "Class created successfully",
             "class_id" => $classId
         ], 201);
     }
@@ -50,21 +50,30 @@ class ClassController
 
         Response::json($classes);
     }
+
     public function delete($id)
     {
         $user = JwtHelper::getUserFromToken();
 
-        if ($user['role'] !== 'ADMIN') {
-            Response::json(["message" => "Forbidden"], 403);
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
         }
+
+        if ($user['role'] !== 'ADMIN' && $user['role'] !== 'SUPER_ADMIN') {
+            Response::json(["message" => "Forbidden - Admin access required"], 403);
+        }
+
         if (!$id) {
             Response::json(["message" => "Class ID required"], 422);
         }
-        $deleted = $this->classModel->delete((int)$id);
+
+        // You need to modify your ClassModel delete method to include school_id check
+        $deleted = $this->classModel->delete((int)$id, (int)$user['school_id']);
+
         if (!$deleted) {
-            Response::json(["message" => "Class not found"], 404);
+            Response::json(["message" => "Class not found or doesn't belong to your school"], 404);
         }
 
-        Response::json(["message" => "Class deleted"]);
+        Response::json(["message" => "Class deleted successfully"]);
     }
 }

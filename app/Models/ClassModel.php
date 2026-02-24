@@ -1,4 +1,3 @@
-
 <?php
 class ClassModel
 {
@@ -41,6 +40,7 @@ class ClassModel
 
         return $this->mapClassesWithSections($rows);
     }
+
     private function mapClassesWithSections(array $rows): array
     {
         $classes = [];
@@ -66,11 +66,12 @@ class ClassModel
 
         return array_values($classes);
     }
-    public function delete(int $id): bool
+
+    public function delete(int $id, int $schoolId): bool
     {
-        $stmt = $this->db->prepare("DELETE FROM classes WHERE id = ?");
-        $stmt->execute([$id]);
+        // Make sure the class belongs to the school before deleting
+        $stmt = $this->db->prepare("DELETE FROM classes WHERE id = ? AND school_id = ?");
+        $stmt->execute([$id, $schoolId]);
         return $stmt->rowCount() > 0;
     }
 }
-?>
