@@ -22,6 +22,10 @@ class Router
     {
         $this->routes['PUT'][] = [$path, $handler];
     }
+    public function patch(string $path, callable $handler)
+    {
+        $this->routes['PATCH'][] = [$path, $handler];
+    }
     public function dispatch()
     {
         $method = $_SERVER['REQUEST_METHOD'];

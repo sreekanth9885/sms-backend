@@ -21,7 +21,7 @@ require_once __DIR__ . '/app/Controllers/StudentController.php';
 require_once __DIR__ . '/app/Controllers/TeacherController.php';
 require_once __DIR__ . '/app/Controllers/FeeTypeController.php';
 require_once __DIR__ . '/app/Controllers/FeeStructureController.php';
-
+require_once __DIR__ . '/app/Controllers/StudentFeeController.php';
 $router = new Router();
 
 $authController = new AuthController($pdo);
@@ -34,6 +34,7 @@ $studentController = new StudentController($pdo);
 $teacherController = new TeacherController($pdo);
 $feeTypeController = new FeeTypeController($pdo);
 $feeStructureController = new FeeStructureController($pdo);
+$studentFeeController = new StudentFeeController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -80,6 +81,17 @@ $router->delete('/fee-types/{id}', [$feeTypeController, 'delete']);
 $router->post('/fee-structures', [$feeStructureController, 'create']);
 $router->get('/fee-structures', [$feeStructureController, 'index']);
 $router->delete('/fee-structures/{id}', [$feeStructureController, 'delete']);
+
+// Student Fee routes
+$router->post('/student-fees/bulk', [$studentFeeController, 'createBulk']);
+$router->get('/student-fees', [$studentFeeController, 'index']);
+$router->get('/student-fees/{id}', [$studentFeeController, 'show']);
+$router->put('/student-fees/{id}', [$studentFeeController, 'update']);
+$router->patch('/student-fees/{id}/payment', [$studentFeeController, 'updatePayment']);
+$router->delete('/student-fees/{id}', [$studentFeeController, 'delete']);
+$router->get('/student-fees/summary', [$studentFeeController, 'summary']);
+$router->get('/student-fees/overdue', [$studentFeeController, 'overdue']);
+$router->get('/students/{studentId}/fees', [$studentFeeController, 'getByStudent']);
 
 
 $router->dispatch();
