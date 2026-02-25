@@ -66,9 +66,15 @@ class StudentFeeModel
                 s.first_name,
                 s.last_name,
                 s.admission_number,
-                CONCAT(s.first_name, ' ', s.last_name) as student_name
+                s.class_id,
+                s.section_id,
+                CONCAT(s.first_name, ' ', s.last_name) as student_name,
+                c.name as class_name,
+                sec.name as section_name
             FROM student_fees sf
             JOIN students s ON sf.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN sections sec ON s.section_id = sec.id
             WHERE 1=1";
     
     $params = [];
@@ -109,8 +115,7 @@ class StudentFeeModel
     $stmt->execute($params);
     
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
+    }
     /**
      * Get student fee by ID
      */
