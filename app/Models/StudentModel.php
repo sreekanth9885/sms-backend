@@ -89,20 +89,26 @@ class StudentModel
     public function allBySchool(int $schoolId, array $filters = []): array
     {
         $sql = "
-        SELECT
-    st.*,
-    CONCAT(st.first_name,' ',st.last_name) AS student_name,
-    c.name AS class_name,
-    s.name AS section_name
+    SELECT
+        st.*,
+        CONCAT(st.first_name,' ',st.last_name) AS student_name,
+        c.name AS class_name,
+        s.name AS section_name
     FROM students st
     JOIN classes c ON c.id = st.class_id
     JOIN sections s ON s.id = st.section_id
-    WHERE st.school_id = ?
-    AND st.is_active = 1;
-
-    ";
+    WHERE st.school_id = ?";
 
         $params = [$schoolId];
+
+        // Make is_active filter optional
+        if (isset($filters['include_inactive']) && $filters['include_inactive'] === true) {
+            // Include both active and inactive students
+            // No is_active filter
+        } else {
+            // Default: only show active students
+            $sql .= " AND st.is_active = 1";
+        }
 
         if (!empty($filters['class_id'])) {
             $sql .= " AND st.class_id = ?";

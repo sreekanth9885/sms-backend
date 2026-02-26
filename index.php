@@ -22,6 +22,7 @@ require_once __DIR__ . '/app/Controllers/TeacherController.php';
 require_once __DIR__ . '/app/Controllers/FeeTypeController.php';
 require_once __DIR__ . '/app/Controllers/FeeStructureController.php';
 require_once __DIR__ . '/app/Controllers/StudentFeeController.php';
+require_once __DIR__ . '/app/Controllers/AttendanceController.php';
 $router = new Router();
 
 $authController = new AuthController($pdo);
@@ -35,7 +36,7 @@ $teacherController = new TeacherController($pdo);
 $feeTypeController = new FeeTypeController($pdo);
 $feeStructureController = new FeeStructureController($pdo);
 $studentFeeController = new StudentFeeController($pdo);
-
+$attendanceController = new AttendanceController($pdo);
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
 $router->post('/auth/logout', [$authController, 'logout']);
@@ -93,5 +94,13 @@ $router->get('/student-fees/summary', [$studentFeeController, 'summary']);
 $router->get('/student-fees/overdue', [$studentFeeController, 'overdue']);
 $router->get('/students/{studentId}/fees', [$studentFeeController, 'getByStudent']);
 
+// Attendance routes
+$router->post('/attendance/bulk', [$attendanceController, 'saveBulk']);
+$router->get('/attendance', [$attendanceController, 'index']);
+$router->get('/attendance/summary', [$attendanceController, 'summary']);
+$router->get('/attendance/student/{studentId}', [$attendanceController, 'getByStudent']);
+$router->get('/attendance/today/{studentId}', [$attendanceController, 'getTodayStatus']);
+$router->get('/attendance/percentage/{studentId}', [$attendanceController, 'getPercentage']);
+$router->delete('/attendance', [$attendanceController, 'delete']);
 
 $router->dispatch();
