@@ -30,7 +30,7 @@ class StudentFeeController
         }
 
         // Validate each assignment
-        foreach ($data['assignments'] as $assignment) {
+        foreach ($data['assignments'] as $index => $assignment) {
             if (empty($assignment['student_id'])) {
                 Response::json(["message" => "Student ID is required for all assignments"], 422);
             }
@@ -43,7 +43,32 @@ class StudentFeeController
         }
 
         try {
+            // Check for existing assignments
+            $existingAssignments = $this->studentFeeModel->checkExistingAssignments($data['assignments']);
+
+            if (!empty($existingAssignments)) {
+                $duplicateDetails = array_map(function ($item) {
+                    return [
+                        'student_id' => $item['student_id'],
+                        'fee_type_id' => $item['fee_type_id'],
+                        'fee_type_name' => $item['fee_type_name'] ?? 'Unknown',
+                        'academic_year' => $item['academic_year'],
+                        'status' => $item['status']
+                    ];
+                }, $existingAssignments);
+
+                Response::json([
+                    "success" => false,
+                    "message" => "Some fee assignments already exist",
+                    "duplicates" => $duplicateDetails,
+                    "total_duplicates" => count($duplicateDetails)
+                ], 409); // 409 Conflict
+            }
+
+            // Prepare assignments for insertion
             $assignments = array_map(function ($assignment) use ($user) {
+                $academic_year = $assignment['academic_year'] ?? date('Y') . '-' . (date('Y') + 1);
+
                 return [
                     'student_id' => (int)$assignment['student_id'],
                     'fee_type_id' => (int)$assignment['fee_type_id'],
@@ -54,8 +79,9 @@ class StudentFeeController
                     'notes' => $assignment['notes'] ?? null,
                     'final_amount' => (float)($assignment['final_amount'] ?? $assignment['amount']),
                     'due_date' => $assignment['due_date'] ?? null,
-                    'academic_year' => $assignment['academic_year'] ?? date('Y') . '-' . (date('Y') + 1),
+                    'academic_year' => $academic_year,
                     'status' => 'pending',
+                    'paid_amount' => 0.00,
                     'created_by' => (int)$user['id'],
                     'created_by_name' => $user['name'] ?? null,
                 ];
@@ -64,12 +90,22 @@ class StudentFeeController
             $result = $this->studentFeeModel->createBulk($assignments);
 
             Response::json([
+                "success" => true,
                 "message" => "Fee assignments created successfully",
                 "count" => count($assignments)
             ], 201);
-
         } catch (Exception $e) {
+            // Check for duplicate entry error
+            if ($e->getCode() == 23000 || strpos($e->getMessage(), 'Duplicate entry') !== false) {
             Response::json([
+                    "success" => false,
+                    "message" => "Duplicate fee assignment detected. This student already has this fee type for the academic year.",
+                    "error" => "duplicate_entry"
+                ], 409);
+            }
+
+            Response::json([
+                "success" => false,
                 "message" => "Failed to create fee assignments",
                 "error" => $e->getMessage()
             ], 500);
