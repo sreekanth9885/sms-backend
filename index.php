@@ -93,6 +93,8 @@ $router->delete('/student-fees/{id}', [$studentFeeController, 'delete']);
 $router->get('/student-fees/summary', [$studentFeeController, 'summary']);
 $router->get('/student-fees/overdue', [$studentFeeController, 'overdue']);
 $router->get('/students/{studentId}/fees', [$studentFeeController, 'getByStudent']);
+$router->post('/student-fees/{id}/collect', [$studentFeeController, 'collectPayment']);
+$router->get('/student-fees/{id}/payments', [$studentFeeController, 'getPaymentHistory']);
 
 // Attendance routes
 $router->post('/attendance/bulk', [$attendanceController, 'saveBulk']);

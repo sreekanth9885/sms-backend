@@ -1,14 +1,18 @@
 <?php
 require_once __DIR__ . '/../Models/StudentFeeModel.php';
 require_once __DIR__ . '/../Helpers/JwtHelper.php';
+require_once __DIR__ . '/../Models/StudentFeePaymentModel.php';
 
 class StudentFeeController
 {
     private StudentFeeModel $studentFeeModel;
-
+    private StudentFeePaymentModel $paymentModel;
+    private PDO $db;
     public function __construct(PDO $db)
     {
         $this->studentFeeModel = new StudentFeeModel($db);
+        $this->paymentModel = new StudentFeePaymentModel($db);
+        $this->db = $db;
     }
 
     /**
@@ -294,5 +298,80 @@ class StudentFeeController
         $overdueFees = $this->studentFeeModel->getOverdueFees($currentDate);
 
         Response::json($overdueFees);
+    }
+    public function collectPayment($id)
+    {
+        $input = json_decode(file_get_contents("php://input"), true);
+
+        $amount = (float) ($input['amount'] ?? 0);
+        $paymentMethod = $input['payment_method'] ?? null;
+        $transactionId = $input['transaction_id'] ?? null;
+        $remarks = $input['remarks'] ?? null;
+
+        if ($amount <= 0) {
+            Response::json(['error' => 'Invalid payment amount'], 422);
+            return;
+        }
+
+        $fee = $this->studentFeeModel->getById($id);
+
+        if (!$fee) {
+            Response::json(['error' => 'Fee record not found'], 404);
+            return;
+        }
+
+        $remaining = $fee['final_amount'] - $fee['paid_amount'];
+
+        if ($amount > $remaining) {
+            Response::json(['error' => 'Payment exceeds remaining balance'], 422);
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // 1️⃣ Insert into payment ledger
+            $this->paymentModel->createPayment([
+                'student_fee_id' => $fee['id'],
+                'student_id' => $fee['student_id'],
+                'paid_amount' => $amount,
+                'payment_method' => $paymentMethod,
+                'transaction_id' => $transactionId,
+                'remarks' => $remarks,
+                'collected_by' => 1, // replace with logged-in user ID
+                'collected_by_name' => 'Admin' // replace dynamically
+            ]);
+
+            // 2️⃣ Update master invoice
+            $newPaidAmount = $fee['paid_amount'] + $amount;
+
+            $status = 'pending';
+            if ($newPaidAmount >= $fee['final_amount']) {
+                $status = 'paid';
+            } elseif ($newPaidAmount > 0) {
+                $status = 'partial';
+            }
+
+            $this->studentFeeModel->updatePaymentDetails($fee['id'], [
+                'paid_amount' => $newPaidAmount,
+                'status' => $status,
+                'paid_date' => date('Y-m-d')
+            ]);
+
+            $this->db->commit();
+
+            Response::json([
+                'message' => 'Payment collected successfully'
+            ]);
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            Response::json(['error' => 'Payment failed'], 500);
+        }
+    }
+    public function getPaymentHistory($id)
+    {
+        $payments = $this->paymentModel->getPaymentsByStudentFeeId($id);
+
+        Response::json($payments);
     }
 }

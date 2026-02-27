@@ -70,7 +70,9 @@ class StudentFeeModel
                 s.section_id,
                 CONCAT(s.first_name, ' ', s.last_name) as student_name,
                 c.name as class_name,
-                sec.name as section_name
+                sec.name as section_name,
+                s.parent_phone,
+                s.alternate_phone
             FROM student_fees sf
             JOIN students s ON sf.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
@@ -507,6 +509,23 @@ class StudentFeeModel
             ':notes' => $newData['notes'] ?? null,
             ':final_amount' => $newData['final_amount'],
             ':due_date' => $newData['due_date'] ?? null
+        ]);
+    }
+    public function updatePaymentDetails(int $id, array $data)
+    {
+        $stmt = $this->db->prepare("
+        UPDATE student_fees
+        SET paid_amount = :paid_amount,
+            status = :status,
+            paid_date = :paid_date
+        WHERE id = :id
+    ");
+
+        return $stmt->execute([
+            ':paid_amount' => $data['paid_amount'],
+            ':status' => $data['status'],
+            ':paid_date' => $data['paid_date'],
+            ':id' => $id
         ]);
     }
 }
