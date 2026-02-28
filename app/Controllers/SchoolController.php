@@ -107,7 +107,8 @@ class SchoolController
     {
         $user = JwtHelper::getUserFromToken();
 
-        if ($user['role'] !== 'SUPER_ADMIN') {
+        // Allow both SUPER_ADMIN and ADMIN to update
+        if ($user['role'] !== 'SUPER_ADMIN' && $user['role'] !== 'ADMIN') {
             Response::json(["message" => "Forbidden"], 403);
         }
 
@@ -157,9 +158,12 @@ class SchoolController
                 Response::json(["message" => "No changes made or school not found"], 400);
             }
 
+            // Fetch the updated school data to return
+            $updatedSchool = $this->school->find((int)$id);
+
             Response::json([
                 "message" => "School updated successfully",
-                "logo_url" => $logoUrl
+                "school" => $updatedSchool
             ]);
         } catch (Exception $e) {
             Response::json([
