@@ -61,7 +61,7 @@ class StudentController
         }
         /* ---------- REQUIRED CHECK ---------- */
 
-        $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
+        $required = ['class_id', 'admission_number', 'first_name'];
 
         foreach ($required as $field) {
             if (empty($data[$field])) {
@@ -72,7 +72,9 @@ class StudentController
         $studentId = $this->studentModel->create([
             'school_id'               => (int)$user['school_id'],
             'class_id'                => (int)$data['class_id'],
-            'section_id'              => (int)$data['section_id'],
+            'section_id' => isset($data['section_id']) && $data['section_id'] !== ''
+                ? (int)$data['section_id']
+                : null,
             'admission_number'        => $data['admission_number'],
             'roll_number'             => $data['roll_number'] ?? null,
             'date_of_admission'       => $data['date_of_admission'] ?? null,
@@ -203,7 +205,7 @@ class StudentController
         }
 
         /* ---------- REQUIRED CHECK ---------- */
-        $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
+        $required = ['class_id', 'admission_number', 'first_name'];
 
         foreach ($required as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
@@ -221,7 +223,9 @@ class StudentController
         /* ---------- UPDATE ---------- */
         // Cast numeric fields to integers
         $data['class_id'] = (int)$data['class_id'];
-        $data['section_id'] = (int)$data['section_id'];
+        $data['section_id'] = isset($data['section_id']) && $data['section_id'] !== ''
+            ? (int)$data['section_id']
+            : null;
         $data['school_id'] = (int)$user['school_id'];
 
         // Remove any fields that shouldn't be updated

@@ -96,7 +96,7 @@ class StudentModel
         s.name AS section_name
     FROM students st
     JOIN classes c ON c.id = st.class_id
-    JOIN sections s ON s.id = st.section_id
+    LEFT JOIN sections s ON s.id = st.section_id
     WHERE st.school_id = ?";
 
         $params = [$schoolId];
