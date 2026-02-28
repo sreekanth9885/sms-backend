@@ -301,6 +301,8 @@ class StudentFeeController
     }
     public function collectPayment($id)
     {
+        $user = JwtHelper::getUserFromToken(); // 🔥 Get logged-in user
+
         $input = json_decode(file_get_contents("php://input"), true);
 
         $amount = (float) ($input['amount'] ?? 0);
@@ -332,14 +334,14 @@ class StudentFeeController
 
             // 1️⃣ Insert into payment ledger
             $this->paymentModel->createPayment([
-                'student_fee_id' => $fee['id'],
-                'student_id' => $fee['student_id'],
-                'paid_amount' => $amount,
-                'payment_method' => $paymentMethod,
-                'transaction_id' => $transactionId,
-                'remarks' => $remarks,
-                'collected_by' => 1, // replace with logged-in user ID
-                'collected_by_name' => 'Admin' // replace dynamically
+                'student_fee_id'   => $fee['id'],
+                'student_id'       => $fee['student_id'],
+                'paid_amount'      => $amount,
+                'payment_method'   => $paymentMethod,
+                'transaction_id'   => $transactionId,
+                'remarks'          => $remarks,
+                'collected_by'     => (int) $user['id'],        // ✅ dynamic
+                'collected_by_name' => $user['name'] ?? null     // ✅ dynamic
             ]);
 
             // 2️⃣ Update master invoice
@@ -354,8 +356,8 @@ class StudentFeeController
 
             $this->studentFeeModel->updatePaymentDetails($fee['id'], [
                 'paid_amount' => $newPaidAmount,
-                'status' => $status,
-                'paid_date' => date('Y-m-d')
+                'status'      => $status,
+                'paid_date'   => date('Y-m-d')
             ]);
 
             $this->db->commit();

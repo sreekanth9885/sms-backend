@@ -34,12 +34,14 @@ class AuthController
         // ✅ Generate tokens via JwtHelper (config-driven)
         $accessToken = JwtHelper::generateAccessToken([
             "id" => $user['id'],
+            "name" => $user['name'],
             "role" => $user['role'],
             "school_id" => $user['school_id'] // Add school context to token
         ]);
 
         $refreshToken = JwtHelper::generateRefreshToken([
             "id" => $user['id'],
+            "name" => $user['name'],
             "role" => $user['role'],
             "school_id" => $user['school_id']
         ]);
