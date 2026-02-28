@@ -61,7 +61,7 @@ class StudentController
         }
         /* ---------- REQUIRED CHECK ---------- */
 
-        $required = ['class_id', 'admission_number', 'first_name'];
+        $required = ['class_id', 'section_id', 'admission_number', 'first_name'];
 
         foreach ($required as $field) {
             if (empty($data[$field])) {
