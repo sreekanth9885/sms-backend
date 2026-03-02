@@ -30,7 +30,7 @@ class AttendanceController
         }
 
         // Validate required fields
-        $required = ['student_id', 'class_id', 'section_id', 'date', 'status'];
+        $required = ['student_id', 'class_id', 'date', 'status'];
         $validStatuses = ['Present', 'Absent', 'Late', 'Half-Day', 'Holiday'];
 
         foreach ($data['attendance'] as $record) {
@@ -85,13 +85,14 @@ class AttendanceController
         $sectionId = $_GET['section_id'] ?? null;
         $date = $_GET['date'] ?? date('Y-m-d');
 
-        if (!$classId || !$sectionId) {
-            Response::json(["message" => "Class ID and Section ID are required"], 422);
+        if (!$classId) {
+            Response::json(["message" => "Class ID is required"], 422);
         }
 
+        // Get attendance - section_id can be null
         $attendance = $this->attendanceModel->getByClassSection(
             (int)$classId,
-            (int)$sectionId,
+            $sectionId ? (int)$sectionId : null,
             $date
         );
 

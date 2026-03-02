@@ -86,60 +86,80 @@ class StudentModel
         return (int)$this->db->lastInsertId();
     }
 
-    public function allBySchool(int $schoolId, array $filters = []): array
-    {
-        $sql = "
-    SELECT
-        st.*,
-        CONCAT(st.first_name,' ',st.last_name) AS student_name,
-        c.name AS class_name,
-        s.name AS section_name
-    FROM students st
-    JOIN classes c ON c.id = st.class_id
-    LEFT JOIN sections s ON s.id = st.section_id
-    WHERE st.school_id = ?";
+    public function allBySchool(
+        int $schoolId,
+        array $filters = [],
+        int $limit = 10,
+        int $offset = 0
+    ): array {
+        $baseSql = "
+        FROM students st
+        JOIN classes c ON c.id = st.class_id
+        LEFT JOIN sections s ON s.id = st.section_id
+        WHERE st.school_id = ?
+        AND st.is_active = 1
+    ";
 
         $params = [$schoolId];
 
-        // Make is_active filter optional
-        if (isset($filters['include_inactive']) && $filters['include_inactive'] === true) {
-            // Include both active and inactive students
-            // No is_active filter
-        } else {
-            // Default: only show active students
-            $sql .= " AND st.is_active = 1";
-        }
-
         if (!empty($filters['class_id'])) {
-            $sql .= " AND st.class_id = ?";
+            $baseSql .= " AND st.class_id = ?";
             $params[] = $filters['class_id'];
         }
 
         if (!empty($filters['section_id'])) {
-            $sql .= " AND st.section_id = ?";
+            $baseSql .= " AND st.section_id = ?";
             $params[] = $filters['section_id'];
         }
 
         if (!empty($filters['search'])) {
-            $sql .= " AND (
+            $baseSql .= " AND (
             st.first_name LIKE ?
             OR st.last_name LIKE ?
             OR st.admission_number LIKE ?
             OR st.roll_number LIKE ?
         )";
             $search = "%" . $filters['search'] . "%";
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
+            $params = array_merge($params, [$search, $search, $search, $search]);
         }
 
-        $sql .= " ORDER BY st.id DESC";
+        // 1️⃣ Get total count
+        $countStmt = $this->db->prepare("SELECT COUNT(*) " . $baseSql);
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
 
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        // 2️⃣ Get paginated data
+        $dataSql = "
+        SELECT
+            st.*,
+            CONCAT(st.first_name,' ',st.last_name) AS student_name,
+            c.name AS class_name,
+            s.name AS section_name
+        " . $baseSql . "
+        ORDER BY st.id DESC
+        LIMIT ? OFFSET ?
+    ";
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $dataParams = array_merge($params, [$limit, $offset]);
+
+        $stmt = $this->db->prepare($dataSql);
+
+        // Bind existing filters first
+        $paramIndex = 1;
+        foreach ($params as $param) {
+            $stmt->bindValue($paramIndex++, $param);
+        }
+
+        // Bind limit and offset as integers
+        $stmt->bindValue($paramIndex++, $limit, PDO::PARAM_INT);
+        $stmt->bindValue($paramIndex++, $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        return [
+            "data" => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            "total" => $total
+        ];
     }
     public function findById(int $id, int $schoolId): ?array
     {

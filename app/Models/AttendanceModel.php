@@ -17,20 +17,26 @@ class AttendanceModel
             $this->db->beginTransaction();
 
             $sql = "INSERT INTO attendance 
-                    (student_id, class_id, section_id, date, status, remarks, marked_by, marked_by_name) 
-                    VALUES (:student_id, :class_id, :section_id, :date, :status, :remarks, :marked_by, :marked_by_name)
-                    ON DUPLICATE KEY UPDATE 
-                    status = VALUES(status),
-                    remarks = VALUES(remarks),
-                    updated_at = CURRENT_TIMESTAMP";
+                (student_id, class_id, section_id, date, status, remarks, marked_by, marked_by_name) 
+                VALUES (:student_id, :class_id, :section_id, :date, :status, :remarks, :marked_by, :marked_by_name)
+                ON DUPLICATE KEY UPDATE 
+                status = VALUES(status),
+                remarks = VALUES(remarks),
+                section_id = VALUES(section_id),
+                updated_at = CURRENT_TIMESTAMP";
 
             $stmt = $this->db->prepare($sql);
 
             foreach ($attendanceData as $data) {
+                // Handle section_id - can be null
+                $sectionId = isset($data['section_id']) && $data['section_id'] !== ''
+                    ? $data['section_id']
+                    : null;
+
                 $stmt->execute([
                     ':student_id' => $data['student_id'],
                     ':class_id' => $data['class_id'],
-                    ':section_id' => $data['section_id'],
+                    ':section_id' => $sectionId,
                     ':date' => $data['date'],
                     ':status' => $data['status'],
                     ':remarks' => $data['remarks'] ?? null,
@@ -41,7 +47,6 @@ class AttendanceModel
 
             $this->db->commit();
             return true;
-
         } catch (Exception $e) {
             $this->db->rollBack();
             error_log("Error in saveBulk: " . $e->getMessage());
@@ -52,51 +57,86 @@ class AttendanceModel
     /**
      * Get attendance for a specific class and section on a date
      */
-    public function getByClassSection(int $classId, int $sectionId, string $date): array
+    /**
+     * Get attendance for a specific class and section on a date
+     */
+    public function getByClassSection(int $classId, ?int $sectionId, string $date): array
 {
-    $sql = "SELECT 
-                a.id,
-                a.student_id,
-                a.class_id,
-                a.section_id,
-                a.date,
-                a.status,
-                a.remarks,
-                a.marked_by,
-                a.marked_by_name,
-                a.created_at,
-                a.updated_at,
-                s.id as student_id,
-                s.first_name,
-                s.last_name,
-                s.admission_number,
-                s.roll_number,
-                CONCAT(s.first_name, ' ', s.last_name) as student_name,
-                :class_id_param as class_id,
-                :section_id_param as section_id,
-                :date_param as date
-            FROM students s
-            LEFT JOIN attendance a ON a.student_id = s.id 
-                AND a.date = :date_join
-                AND a.class_id = :class_id_join 
-                AND a.section_id = :section_id_join
-            WHERE s.class_id = :class_id_where 
-                AND s.section_id = :section_id_where
-            ORDER BY s.roll_number ASC";
+        // First, get all students in the class (and section if provided)
+        $studentSql = "SELECT 
+                    s.id as student_id,
+                    s.first_name,
+                    s.last_name,
+                    s.admission_number,
+                    s.roll_number,
+                    CONCAT(s.first_name, ' ', s.last_name) as student_name
+                FROM students s
+                WHERE s.class_id = :class_id";
 
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute([
-        ':class_id_param' => $classId,
-        ':section_id_param' => $sectionId,
-        ':date_param' => $date,
-        ':date_join' => $date,
-        ':class_id_join' => $classId,
-        ':section_id_join' => $sectionId,
-        ':class_id_where' => $classId,
-        ':section_id_where' => $sectionId
-    ]);
+        $studentParams = [':class_id' => $classId];
 
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($sectionId !== null) {
+            $studentSql .= " AND s.section_id = :section_id";
+            $studentParams[':section_id'] = $sectionId;
+        }
+
+        $studentSql .= " ORDER BY s.roll_number ASC";
+
+        $studentStmt = $this->db->prepare($studentSql);
+        $studentStmt->execute($studentParams);
+        $students = $studentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($students)) {
+            return [];
+        }
+
+        // Get student IDs
+        $studentIds = array_column($students, 'student_id');
+        $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
+
+        // Get attendance records for these students on this date
+        $attendanceSql = "SELECT * FROM attendance 
+                      WHERE student_id IN ({$placeholders}) 
+                      AND date = ?";
+
+        $attendanceParams = array_merge($studentIds, [$date]);
+
+        $attendanceStmt = $this->db->prepare($attendanceSql);
+        $attendanceStmt->execute($attendanceParams);
+        $attendanceRecords = $attendanceStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map attendance records by student_id
+        $attendanceMap = [];
+        foreach ($attendanceRecords as $record) {
+            $attendanceMap[$record['student_id']] = $record;
+        }
+
+        // Combine students with their attendance
+        $result = [];
+        foreach ($students as $student) {
+            $studentId = $student['student_id'];
+            if (isset($attendanceMap[$studentId])) {
+                // Student has attendance record
+                $result[] = array_merge($student, $attendanceMap[$studentId]);
+            } else {
+                // Student has no attendance record for this date
+                $result[] = array_merge($student, [
+                    'id' => null,
+                    'student_id' => $studentId,
+                    'class_id' => $classId,
+                    'section_id' => $sectionId,
+                    'date' => $date,
+                    'status' => null,
+                    'remarks' => null,
+                    'marked_by' => null,
+                    'marked_by_name' => null,
+                    'created_at' => null,
+                    'updated_at' => null
+                ]);
+            }
+        }
+
+        return $result;
 }
 
     /**

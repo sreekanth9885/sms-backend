@@ -115,18 +115,36 @@ class StudentController
     {
         $user = JwtHelper::getUserFromToken();
 
+        $page  = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+
+        if ($page < 1) $page = 1;
+        if ($limit < 1) $limit = 10;
+
+        $offset = ($page - 1) * $limit;
+
         $filters = [
-            'class_id' => $_GET['class_id'] ?? null,
+            'class_id'   => $_GET['class_id'] ?? null,
             'section_id' => $_GET['section_id'] ?? null,
-            'search' => $_GET['search'] ?? null,
+            'search'     => $_GET['search'] ?? null,
         ];
 
-        $students = $this->studentModel->allBySchool(
+        $result = $this->studentModel->allBySchool(
             (int)$user['school_id'],
-            $filters
+            $filters,
+            $limit,
+            $offset
         );
 
-        Response::json($students);
+        Response::json([
+            "data" => $result['data'],
+            "pagination" => [
+                "total" => $result['total'],
+                "page" => $page,
+                "limit" => $limit,
+                "total_pages" => ceil($result['total'] / $limit)
+            ]
+        ]);
     }
 
     public function show($id)
