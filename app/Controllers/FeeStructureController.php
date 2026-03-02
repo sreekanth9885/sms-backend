@@ -25,6 +25,21 @@ class FeeStructureController
             Response::json(["message" => "Missing required fields"], 422);
         }
 
+        // Check if fee structure already exists for this combination
+        $existing = $this->model->findByCombination(
+            (int)$user['school_id'],
+            $data['class_id'] ?? null,
+            (int)$data['fee_type_id'],
+            $data['academic_year']
+        );
+
+        if ($existing) {
+            Response::json([
+                "message" => "Fee structure already exists for this class, fee type, and academic year",
+                "existing_id" => $existing['id']
+            ], 409); // 409 Conflict
+        }
+
         $id = $this->model->create(
             (int)$user['school_id'],
             $data['class_id'] ?? null,
