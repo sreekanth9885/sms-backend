@@ -44,7 +44,7 @@ $router->post('/auth/force-reset-password', [$authController, 'forceResetPasswor
 $router->post('/auth/refresh', [$authController, 'refresh']);
 $router->post('/auth/forgot-password', [$authController, 'forgotPassword']);
 $router->post('/auth/reset-password', [$authController, 'resetPassword']);
-$router->post('/auth/verify-reset-token', [$authController, 'verifyResetToken']);
+$router->get('/auth/verify-reset-token', [$authController, 'verifyResetToken']);
 $router->post('/auth/forgot-username', [$authController, 'forgotUsername']);
 $router->get('/users', [$userController, 'index']);
 
