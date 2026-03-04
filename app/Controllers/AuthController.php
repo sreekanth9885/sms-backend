@@ -49,7 +49,8 @@ class AuthController
         $stmt->execute([$user['id'], $resetToken, $expiresAt]);
 
         // Send email with reset link
-        $resetLink = "http://" . $_SERVER['HTTP_HOST'] . "/reset-password?token=" . $resetToken;
+        // Replace the current line with this:
+        $resetLink = "https://sms.academicprojects.org/reset-password?token=" . $resetToken;
 
         // You'll need to implement MailHelper
         $mailSent = MailHelper::sendPasswordResetEmail($email, $resetLink);
