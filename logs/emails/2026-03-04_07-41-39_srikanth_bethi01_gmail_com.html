@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Log - Development Mode</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f8ff; }
+        .dev-badge { 
+            background: #ff6b6b; 
+            color: white; 
+            padding: 10px; 
+            border-radius: 5px; 
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .header { background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .label { font-weight: bold; color: #2c3e50; width: 100px; display: inline-block; }
+        .value { margin-bottom: 10px; }
+        .content { border: 2px dashed #4CAF50; padding: 20px; border-radius: 5px; background: white; }
+    </style>
+</head>
+<body>
+    <div class='dev-badge'>
+        🔧 DEVELOPMENT MODE - Email Logged (Not Sent)
+    </div>
+    <div class='header'>
+        <div class='value'><span class='label'>To:</span> srikanth.bethi01@gmail.com</div>
+        <div class='value'><span class='label'>Subject:</span> Password Reset Request - School Management System</div>
+        <div class='value'><span class='label'>Date:</span> 2026-03-04 07:41:39</div>
+        <div class='value'><span class='label'>From:</span> School Management System &lt;no-reply@academicprojects.org&gt;</div>
+        <div class='value'><span class='label'>Reset Link:</span> </div>
+    </div>
+    <div class='content'>
+        
+        <html>
+        <head>
+            <title>Password Reset</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; background-color: #f4f4f4; }
+                .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                .header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 30px; text-align: center; }
+                .header h1 { color: white; margin: 0; font-size: 24px; }
+                .content { padding: 40px 30px; }
+                .button { 
+                    display: inline-block; 
+                    padding: 12px 30px; 
+                    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                    color: white; 
+                    text-decoration: none; 
+                    border-radius: 5px;
+                    font-weight: bold;
+                    margin: 20px 0;
+                }
+                .footer { 
+                    background: #f8fafc; 
+                    padding: 20px; 
+                    text-align: center; 
+                    color: #64748b; 
+                    font-size: 14px;
+                    border-top: 1px solid #e2e8f0;
+                }
+                .warning { 
+                    background: #fff3cd; 
+                    border: 1px solid #ffe69c; 
+                    color: #856404; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    font-size: 14px;
+                    margin-top: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🔐 Password Reset Request</h1>
+                </div>
+                <div class='content'>
+                    <p>Hello,</p>
+                    <p>We received a request to reset your password for your School Management System account. Click the button below to proceed:</p>
+                    
+                    <div style='text-align: center;'>
+                        <a href='http://localhost:8000/reset-password?token=c1f306d86b02dc241e4e659e85f34592a71180c624806d33dd1984928c4ea0ca' class='button'>Reset Password</a>
+                    </div>
+                    
+                    <div class='warning'>
+                        ⚠️ This link will expire in <strong>1 hour</strong> for security reasons.
+                    </div>
+                    
+                    <p>If you didn't request this password reset, please ignore this email or contact your system administrator if you have concerns.</p>
+                    
+                    <p>For security, please:</p>
+                    <ul>
+                        <li>Never share this link with anyone</li>
+                        <li>Choose a strong password that you don't use elsewhere</li>
+                        <li>Enable two-factor authentication if available</li>
+                    </ul>
+                </div>
+                <div class='footer'>
+                    <p>© 2026 School Management System. All rights reserved.</p>
+                    <p>This is an automated message, please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        
+    </div>
+</body>
+</html>

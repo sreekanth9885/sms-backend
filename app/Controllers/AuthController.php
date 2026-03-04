@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../Models/User.php';
 require_once __DIR__ . '/../Helpers/JwtHelper.php';
 require_once __DIR__ . '/../Core/Response.php';
-
+require_once __DIR__ . '/../Helpers/MailHelper.php';
 class AuthController
 {
     private User $user;
@@ -13,7 +13,163 @@ class AuthController
         $this->user = new User($db);
         $this->db = $db;
     }
+    /* =========================
+       FORGOT PASSWORD - Request reset link
+    ========================== */
+    public function forgotPassword()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
 
+        if (empty($data['email'])) {
+            Response::json(["message" => "Email is required"], 400);
+        }
+
+        $email = $data['email'];
+        $user = $this->user->findByEmail($email);
+
+        // Always return success even if user doesn't exist (security through obscurity)
+        if (!$user) {
+            Response::json(["message" => "If your email exists in our system, you will receive a reset link"], 200);
+        }
+
+        // Generate a secure reset token
+        $resetToken = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+        // Store token in database
+        $stmt = $this->db->prepare("
+            INSERT INTO password_resets (user_id, token, expires_at, created_at)
+            VALUES (?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+            token = VALUES(token),
+            expires_at = VALUES(expires_at),
+            created_at = NOW()
+        ");
+
+        $stmt->execute([$user['id'], $resetToken, $expiresAt]);
+
+        // Send email with reset link
+        $resetLink = "http://" . $_SERVER['HTTP_HOST'] . "/reset-password?token=" . $resetToken;
+
+        // You'll need to implement MailHelper
+        $mailSent = MailHelper::sendPasswordResetEmail($email, $resetLink);
+
+        if (!$mailSent) {
+            // Log error but don't tell user
+            error_log("Failed to send password reset email to: " . $email);
+        }
+
+        Response::json(["message" => "If your email exists in our system, you will receive a reset link"], 200);
+    }
+
+    /* =========================
+       VERIFY RESET TOKEN
+    ========================== */
+    public function verifyResetToken()
+    {
+        $token = $_GET['token'] ?? '';
+
+        if (empty($token)) {
+            Response::json(["message" => "Token is required"], 400);
+        }
+
+        // Check if token exists and is not expired
+        $stmt = $this->db->prepare("
+            SELECT pr.*, u.email 
+            FROM password_resets pr
+            JOIN users u ON pr.user_id = u.id
+            WHERE pr.token = ? AND pr.expires_at > NOW()
+        ");
+        $stmt->execute([$token]);
+        $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$reset) {
+            Response::json(["message" => "Invalid or expired token"], 400);
+        }
+
+        Response::json([
+            "message" => "Token is valid",
+            "email" => $reset['email']
+        ]);
+    }
+
+    /* =========================
+       RESET PASSWORD
+    ========================== */
+    public function resetPassword()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['token']) || empty($data['newPassword'])) {
+            Response::json(["message" => "Token and new password are required"], 400);
+        }
+
+        // Validate password strength
+        if (strlen($data['newPassword']) < 8) {
+            Response::json(["message" => "Password must be at least 8 characters long"], 400);
+        }
+
+        // Get valid token
+        $stmt = $this->db->prepare("
+            SELECT pr.user_id, u.email 
+            FROM password_resets pr
+            JOIN users u ON pr.user_id = u.id
+            WHERE pr.token = ? AND pr.expires_at > NOW()
+        ");
+        $stmt->execute([$data['token']]);
+        $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$reset) {
+            Response::json(["message" => "Invalid or expired token"], 400);
+        }
+
+        // Update password
+        $hashedPassword = password_hash($data['newPassword'], PASSWORD_BCRYPT);
+
+        $stmt = $this->db->prepare("
+            UPDATE users 
+            SET password = ?, must_reset_password = 0, password_changed_at = NOW() 
+            WHERE id = ?
+        ");
+        $stmt->execute([$hashedPassword, $reset['user_id']]);
+
+        // Delete used token
+        $stmt = $this->db->prepare("DELETE FROM password_resets WHERE token = ?");
+        $stmt->execute([$data['token']]);
+
+        // Optionally, invalidate all refresh tokens for security
+        // You might want to implement a token blacklist here
+
+        Response::json(["message" => "Password reset successful"]);
+    }
+
+    /* =========================
+       FORGOT USERNAME
+    ========================== */
+    public function forgotUsername()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['email'])) {
+            Response::json(["message" => "Email is required"], 400);
+        }
+
+        $email = $data['email'];
+        $user = $this->user->findByEmail($email);
+
+        if (!$user) {
+            Response::json(["message" => "If your email exists in our system, you will receive your username"], 200);
+        }
+
+        // Send email with username
+        $mailSent = MailHelper::sendUsernameReminderEmail($email, $user['name']);
+
+        if (!$mailSent) {
+            error_log("Failed to send username reminder email to: " . $email);
+        }
+
+        Response::json(["message" => "If your email exists in our system, you will receive your username"], 200);
+    }
     /* =========================
        LOGIN
     ========================== */
