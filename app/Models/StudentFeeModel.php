@@ -61,7 +61,13 @@ class StudentFeeModel
      */
     public function getAll(array $filters = []): array
 {
-    $sql = "SELECT 
+        // CRITICAL: Ensure school_id is provided
+        if (empty($filters['school_id'])) {
+            error_log("Security: getAll called without school_id filter");
+            return []; // Return empty array instead of all schools
+        }
+
+        $sql = "SELECT 
                 sf.*,
                 s.first_name,
                 s.last_name,
@@ -77,9 +83,10 @@ class StudentFeeModel
             JOIN students s ON sf.student_id = s.id
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN sections sec ON s.section_id = sec.id
-            WHERE 1=1";
-    
-    $params = [];
+            WHERE s.school_id = :school_id";
+
+        // Initialize params array with school_id
+        $params = [':school_id' => $filters['school_id']];
 
     if (!empty($filters['student_id'])) {
         $sql .= " AND sf.student_id = :student_id";

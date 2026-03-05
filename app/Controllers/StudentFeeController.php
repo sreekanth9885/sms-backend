@@ -123,8 +123,12 @@ class StudentFeeController
     public function index()
     {
         $user = JwtHelper::getUserFromToken();
-
+        $schoolId = $user['school_id'] ?? null;
+        if (!$schoolId) {
+            Response::json(["message" => "School context missing"], 403);
+        }
         $filters = [
+            'school_id' => $schoolId,
             'student_id' => $_GET['student_id'] ?? null,
             'class_id' => $_GET['class_id'] ?? null,
             'section_id' => $_GET['section_id'] ?? null,
