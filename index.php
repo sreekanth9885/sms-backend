@@ -23,6 +23,7 @@ require_once __DIR__ . '/app/Controllers/FeeTypeController.php';
 require_once __DIR__ . '/app/Controllers/FeeStructureController.php';
 require_once __DIR__ . '/app/Controllers/StudentFeeController.php';
 require_once __DIR__ . '/app/Controllers/AttendanceController.php';
+require_once __DIR__ . '/app/Controllers/StudentAuthController.php';
 $router = new Router();
 
 $authController = new AuthController($pdo);
@@ -37,6 +38,8 @@ $feeTypeController = new FeeTypeController($pdo);
 $feeStructureController = new FeeStructureController($pdo);
 $studentFeeController = new StudentFeeController($pdo);
 $attendanceController = new AttendanceController($pdo);
+$studentAuthController = new StudentAuthController($pdo);
+
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
 $router->post('/auth/logout', [$authController, 'logout']);
@@ -107,5 +110,10 @@ $router->get('/attendance/student/{studentId}', [$attendanceController, 'getBySt
 $router->get('/attendance/today/{studentId}', [$attendanceController, 'getTodayStatus']);
 $router->get('/attendance/percentage/{studentId}', [$attendanceController, 'getPercentage']);
 $router->delete('/attendance', [$attendanceController, 'delete']);
+
+$router->post('/auth/student-login', [$studentAuthController, 'studentLogin']);
+$router->post('/auth/student-logout', [$studentAuthController, 'studentLogout']);
+$router->post('/register-device', [$studentAuthController, 'registerDeviceToken']);
+// $router->get('/student/profile', [$studentAuthController, 'getProfile']);
 
 $router->dispatch();

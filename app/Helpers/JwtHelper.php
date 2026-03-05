@@ -120,4 +120,23 @@ class JwtHelper
 
         return self::verify($token);
     }
+    // In JwtHelper.php, update the payload verification
+    public static function getUserFromTokenMobile()
+    {
+        $headers = apache_request_headers();
+        $authHeader = $headers['Authorization'] ?? '';
+
+        if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            throw new Exception('No token provided');
+        }
+
+        $token = $matches[1];
+        $payload = self::verify($token);
+
+        if (!$payload) {
+            throw new Exception('Invalid token');
+        }
+
+        return $payload;
+    }
 }
