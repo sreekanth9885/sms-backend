@@ -22,44 +22,64 @@ class ClassModel
     public function allBySchool(int $schoolId): array
     {
         $sql = "
+        WITH class_student_counts AS (
             SELECT 
-                c.id   AS class_id,
-                c.name AS class_name,
-                s.id   AS section_id,
-                s.name AS section_name
-            FROM classes c
-            LEFT JOIN sections s ON s.class_id = c.id
-            WHERE c.school_id = ?
-            ORDER BY c.id, s.name
-        ";
+                class_id,
+                COUNT(*) as total_students
+            FROM students
+            WHERE school_id = ? 
+                AND is_active = 1
+            GROUP BY class_id
+        )
+        SELECT 
+            c.id   AS class_id,
+            c.name AS class_name,
+            s.id   AS section_id,
+            s.name AS section_name,
+            COALESCE(csc.total_students, 0) AS total_students,
+            (
+                SELECT COUNT(*) 
+                FROM students st 
+                WHERE st.class_id = c.id 
+                AND st.section_id = s.id
+                AND st.school_id = ? 
+                AND st.is_active = 1
+            ) AS section_students
+        FROM classes c
+        LEFT JOIN sections s ON s.class_id = c.id
+        LEFT JOIN class_student_counts csc ON csc.class_id = c.id
+        WHERE c.school_id = ?
+        ORDER BY c.id, s.name
+    ";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$schoolId]);
+        $stmt->execute([$schoolId, $schoolId, $schoolId]); // school_id for CTE, section students, and WHERE clause
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return $this->mapClassesWithSections($rows);
     }
-
     private function mapClassesWithSections(array $rows): array
     {
         $classes = [];
 
         foreach ($rows as $row) {
-            $classId = (int)$row['class_id'];
+            $classId = $row['class_id'];
 
             if (!isset($classes[$classId])) {
                 $classes[$classId] = [
-                    "id" => $classId,
-                    "name" => $row['class_name'],
-                    "sections" => []
+                    'id' => $classId,
+                    'name' => $row['class_name'],
+                    'total_students' => (int)$row['total_students'],
+                    'sections' => []
                 ];
             }
 
             if ($row['section_id']) {
                 $classes[$classId]['sections'][] = [
-                    "id" => (int)$row['section_id'],
-                    "name" => $row['section_name']
+                    'id' => $row['section_id'],
+                    'name' => $row['section_name'],
+                    'total_students' => (int)$row['section_students']
                 ];
             }
         }
