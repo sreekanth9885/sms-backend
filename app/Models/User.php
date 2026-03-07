@@ -17,7 +17,8 @@ class User
             s.id   AS school_id,
             s.name AS school_name,
             s.code AS school_code,
-            s.logo_url AS school_logo_url
+            s.logo_url AS school_logo_url,
+            s.contact_phone_primary AS contact_phone_primary
         FROM users u
         LEFT JOIN schools s ON s.id = u.school_id
         WHERE u.email = ? AND u.is_active = 1

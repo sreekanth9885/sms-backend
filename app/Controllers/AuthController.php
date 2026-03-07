@@ -230,7 +230,8 @@ class AuthController
                     "id"   => $user['school_id'],
                     "name" => $user['school_name'],
                     "code" => $user['school_code'],
-                    "logo_url" => $user['school_logo_url']
+                    "logo_url" => $user['school_logo_url'],
+                    "contact_phone_primary"=>$user['contact_phone_primary']
                 ] : null
             ]
         ]);
