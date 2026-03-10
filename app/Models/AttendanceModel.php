@@ -147,8 +147,8 @@ class AttendanceModel
         $sql = "SELECT a.*, 
                 c.name as class_name, sec.name as section_name
                 FROM attendance a
-                JOIN classes c ON a.class_id = c.id
-                JOIN sections sec ON a.section_id = sec.id
+                LEFT JOIN classes c ON a.class_id = c.id
+                LEFT JOIN sections sec ON a.section_id = sec.id
                 WHERE a.student_id = :student_id";
         
         $params = [':student_id' => $studentId];
