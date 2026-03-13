@@ -92,7 +92,6 @@ class StudentModel
         int $limit = 10,
         int $offset = 0
     ): array {
-
         $baseSql = "
         FROM students st
         JOIN classes c ON c.id = st.class_id
@@ -103,76 +102,57 @@ class StudentModel
 
         $params = [$schoolId];
 
-        // Class filter
         if (!empty($filters['class_id'])) {
             $baseSql .= " AND st.class_id = ?";
             $params[] = $filters['class_id'];
         }
 
-        // Section filter
         if (!empty($filters['section_id'])) {
             $baseSql .= " AND st.section_id = ?";
             $params[] = $filters['section_id'];
         }
 
-        // Search filter
         if (!empty($filters['search'])) {
-
             $baseSql .= " AND (
             st.first_name LIKE ?
             OR st.last_name LIKE ?
             OR st.admission_number LIKE ?
             OR st.roll_number LIKE ?
         )";
-
             $search = "%" . $filters['search'] . "%";
-
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
-            $params[] = $search;
+            $params = array_merge($params, [$search, $search, $search, $search]);
         }
 
-        // ---------- TOTAL COUNT ----------
-        $countSql = "SELECT COUNT(*) " . $baseSql;
-
-        $countStmt = $this->db->prepare($countSql);
+        // 1️⃣ Get total count
+        $countStmt = $this->db->prepare("SELECT COUNT(*) " . $baseSql);
         $countStmt->execute($params);
-
         $total = (int)$countStmt->fetchColumn();
 
-        // ---------- MAIN DATA QUERY ----------
+        // 2️⃣ Get paginated data
         $dataSql = "
         SELECT
             st.*,
             CONCAT(st.first_name,' ',st.last_name) AS student_name,
             c.name AS class_name,
             s.name AS section_name
-    " . $baseSql . "
+        " . $baseSql . "
         ORDER BY st.id DESC
+        LIMIT ? OFFSET ?
     ";
 
-        $dataParams = $params;
-
-        // Apply pagination ONLY when search is empty
-        if (empty($filters['search'])) {
-            $dataSql .= " LIMIT ? OFFSET ?";
-            $dataParams[] = $limit;
-            $dataParams[] = $offset;
-        }
+        $dataParams = array_merge($params, [$limit, $offset]);
 
         $stmt = $this->db->prepare($dataSql);
 
+        // Bind existing filters first
         $paramIndex = 1;
-
-        foreach ($dataParams as $param) {
-
-            if ($param === $limit || $param === $offset) {
-                $stmt->bindValue($paramIndex++, $param, PDO::PARAM_INT);
-            } else {
+        foreach ($params as $param) {
             $stmt->bindValue($paramIndex++, $param);
         }
-        }
+
+        // Bind limit and offset as integers
+        $stmt->bindValue($paramIndex++, $limit, PDO::PARAM_INT);
+        $stmt->bindValue($paramIndex++, $offset, PDO::PARAM_INT);
 
         $stmt->execute();
 

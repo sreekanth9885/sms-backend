@@ -4,146 +4,17 @@ require_once __DIR__ . '/../Models/User.php';
 require_once __DIR__ . '/../Helpers/JwtHelper.php';
 require_once __DIR__ . '/../Core/Response.php';
 require_once __DIR__ . '/../Helpers/MailHelper.php';
-
 class AuthController
 {
     private User $user;
     private PDO $db;
-
     public function __construct(PDO $db)
     {
         $this->user = new User($db);
         $this->db = $db;
     }
-
-    /**
-     * Format school data from user record
-     */
-    private function formatSchoolData(array $userData): ?array
-    {
-        if (!$userData['school_id']) {
-            return null;
-        }
-
-        return [
-            "id" => $userData['school_id'],
-            "name" => $userData['school_name'],
-            "tagline" => $userData['school_tagline'] ?? null,
-            "code" => $userData['school_code'],
-            "address" => $userData['school_address'] ?? null,
-            "latitude" => $userData['school_latitude'] ? (float)$userData['school_latitude'] : null,
-            "longitude" => $userData['school_longitude'] ? (float)$userData['school_longitude'] : null,
-            "contact_name" => $userData['school_contact_name'] ?? null,
-            "contact_designation" => $userData['school_contact_designation'] ?? null,
-            "contact_email" => $userData['school_contact_email'] ?? null,
-            "contact_phone_primary" => $userData['school_contact_phone_primary'] ?? null,
-            "contact_phone_secondary" => $userData['school_contact_phone_secondary'] ?? null,
-            "board" => $userData['school_board'] ?? null,
-            "established_date" => $userData['school_established_date'] ?? null,
-            "website" => $userData['school_website'] ?? null,
-            "logo_url" => $userData['school_logo_url'] ?? null,
-            "is_active" => (bool)$userData['school_is_active'],
-            "created_by" => $userData['school_created_by'] ? (int)$userData['school_created_by'] : null,
-            "created_at" => $userData['school_created_at'] ?? null,
-            "updated_at" => $userData['school_updated_at'] ?? null
-        ];
-    }
-
     /* =========================
-       LOGIN
-    ========================== */
-    public function login()
-    {
-        $data = json_decode(file_get_contents("php://input"), true);
-
-        if (empty($data['email']) || empty($data['password'])) {
-            Response::json(["message" => "Email and password required"], 400);
-        }
-
-        $user = $this->user->findByEmail($data['email']);
-
-        if (!$user || !password_verify($data['password'], $user['password'])) {
-            Response::json(["message" => "Invalid credentials"], 401);
-        }
-
-        // Generate tokens via JwtHelper
-        $accessToken = JwtHelper::generateAccessToken([
-            "id" => $user['id'],
-            "name" => $user['name'],
-            "role" => $user['role'],
-            "school_id" => $user['school_id']
-        ]);
-
-        $refreshToken = JwtHelper::generateRefreshToken([
-            "id" => $user['id'],
-            "name" => $user['name'],
-            "role" => $user['role'],
-            "school_id" => $user['school_id']
-        ]);
-
-        // Refresh token cookie
-        setcookie(
-            "refresh_token",
-            $refreshToken,
-            [
-                "expires"  => time() + 604800, // 7 days
-                "path"     => "/",
-                "httponly" => true,
-                "secure"   => isset($_SERVER['HTTPS']),
-                "samesite" => "Lax"
-            ]
-        );
-
-        // Format complete school data
-        $schoolData = $this->formatSchoolData($user);
-
-        Response::json([
-            "message" => "Login successful",
-            "access_token" => $accessToken,
-            "user" => [
-                "id" => (int)$user['id'],
-                "name" => $user['name'],
-                "email" => $user['email'],
-                "role" => $user['role'],
-                "must_reset_password" => (bool)$user['must_reset_password'],
-                "school" => $schoolData
-            ]
-        ]);
-    }
-
-    /* =========================
-       GET CURRENT USER
-    ========================== */
-    public function me()
-    {
-        try {
-            $user = JwtHelper::getUserFromToken();
-
-            // Fetch fresh user data with school context
-            $userData = $this->user->findById($user['id']);
-
-            if (!$userData) {
-                Response::json(["message" => "User not found"], 404);
-            }
-
-            // Format complete school data
-            $schoolData = $this->formatSchoolData($userData);
-
-            Response::json([
-                "id" => (int)$userData['id'],
-                "name" => $userData['name'],
-                "email" => $userData['email'],
-                "role" => $userData['role'],
-                "must_reset_password" => (bool)$userData['must_reset_password'],
-                "school" => $schoolData
-            ]);
-        } catch (Exception $e) {
-            Response::json(["message" => "Unauthorized"], 401);
-        }
-    }
-
-    /* =========================
-       FORGOT PASSWORD
+       FORGOT PASSWORD - Request reset link
     ========================== */
     public function forgotPassword()
     {
@@ -178,6 +49,7 @@ class AuthController
         $stmt->execute([$user['id'], $resetToken, $expiresAt]);
 
         // Send email with reset link
+        // Replace the current line with this:
         $resetLink = "https://sms.academicprojects.org/reset-password?token=" . $resetToken;
 
         // You'll need to implement MailHelper
@@ -266,6 +138,9 @@ class AuthController
         $stmt = $this->db->prepare("DELETE FROM password_resets WHERE token = ?");
         $stmt->execute([$data['token']]);
 
+        // Optionally, invalidate all refresh tokens for security
+        // You might want to implement a token blacklist here
+
         Response::json(["message" => "Password reset successful"]);
     }
 
@@ -296,6 +171,71 @@ class AuthController
 
         Response::json(["message" => "If your email exists in our system, you will receive your username"], 200);
     }
+    /* =========================
+       LOGIN
+    ========================== */
+    public function login()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['email']) || empty($data['password'])) {
+            Response::json(["message" => "Email and password required"], 400);
+        }
+
+        $user = $this->user->findByEmail($data['email']);
+
+        if (!$user || !password_verify($data['password'], $user['password'])) {
+            Response::json(["message" => "Invalid credentials"], 401);
+        }
+
+        // ✅ Generate tokens via JwtHelper (config-driven)
+        $accessToken = JwtHelper::generateAccessToken([
+            "id" => $user['id'],
+            "name" => $user['name'],
+            "role" => $user['role'],
+            "school_id" => $user['school_id'] // Add school context to token
+        ]);
+
+        $refreshToken = JwtHelper::generateRefreshToken([
+            "id" => $user['id'],
+            "name" => $user['name'],
+            "role" => $user['role'],
+            "school_id" => $user['school_id']
+        ]);
+
+        // ✅ Refresh token cookie (env-aware)
+        setcookie(
+            "refresh_token",
+            $refreshToken,
+            [
+                "expires"  => time() + 604800, // 7 days
+                "path"     => "/",
+                "httponly" => true,
+                "secure"   => isset($_SERVER['HTTPS']), // localhost-safe
+                "samesite" => "Lax"
+            ]
+        );
+
+        Response::json([
+            "message" => "Login successful",
+            "access_token" => $accessToken,
+            "user" => [
+                "id"    => $user['id'],
+                "name"  => $user['name'],
+                "email" => $user['email'],
+                "role"  => $user['role'],
+                "must_reset_password" => (bool)$user['must_reset_password'],
+                // ✅ SCHOOL CONTEXT (NULL for SUPER_ADMIN)
+                "school" => $user['school_id'] ? [
+                    "id"   => $user['school_id'],
+                    "name" => $user['school_name'],
+                    "code" => $user['school_code'],
+                    "logo_url" => $user['school_logo_url'],
+                    "contact_phone_primary"=>$user['contact_phone_primary']
+                ] : null
+            ]
+        ]);
+    }
 
     /* =========================
        LOGOUT
@@ -316,10 +256,6 @@ class AuthController
 
         Response::json(["message" => "Logged out successfully"]);
     }
-
-    /* =========================
-       FORCE RESET PASSWORD
-    ========================== */
     public function forceResetPassword()
     {
         $user = JwtHelper::getUserFromToken();
@@ -333,19 +269,15 @@ class AuthController
         $hashed = password_hash($data['password'], PASSWORD_BCRYPT);
 
         $stmt = $this->db->prepare("
-            UPDATE users
-            SET password = ?, must_reset_password = 0, password_changed_at = NOW()
-            WHERE id = ?
-        ");
+        UPDATE users
+        SET password = ?, must_reset_password = 0, password_changed_at = NOW()
+        WHERE id = ?
+    ");
 
         $stmt->execute([$hashed, $user['id']]);
 
         Response::json(["message" => "Password updated successfully"]);
     }
-
-    /* =========================
-       REFRESH TOKEN
-    ========================== */
     public function refresh()
     {
         if (!isset($_COOKIE['refresh_token'])) {
@@ -370,5 +302,42 @@ class AuthController
         Response::json([
             "access_token" => $accessToken
         ]);
+    }
+    public function me()
+    {
+        try {
+            $user = JwtHelper::getUserFromToken();
+
+            // Fetch fresh user data (including school context)
+            $stmt = $this->db->prepare("
+                SELECT u.id, u.name, u.email, u.role, u.must_reset_password,
+                       s.id AS school_id, s.name AS school_name, s.code AS school_code, s.logo_url AS school_logo_url
+                FROM users u
+                LEFT JOIN schools s ON u.school_id = s.id
+                WHERE u.id = ?
+            ");
+            $stmt->execute([$user['id']]);
+            $userData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$userData) {
+                Response::json(["message" => "User not found"], 404);
+            }
+
+            Response::json([
+                "id"    => $userData['id'],
+                "name"  => $userData['name'],
+                "email" => $userData['email'],
+                "role"  => $userData['role'],
+                "must_reset_password" => (bool)$userData['must_reset_password'],
+                "school" => $userData['school_id'] ? [
+                    "id"   => $userData['school_id'],
+                    "name" => $userData['school_name'],
+                    "code" => $userData['school_code'],
+                    "logo_url" => $userData['school_logo_url']
+                ] : null
+            ]);
+        } catch (Exception $e) {
+            Response::json(["message" => "Unauthorized"], 401);
+        }
     }
 }
