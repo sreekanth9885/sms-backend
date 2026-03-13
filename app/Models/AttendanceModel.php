@@ -11,29 +11,68 @@ class AttendanceModel
     /**
      * Save or update attendance for multiple students
      */
+    // In AttendanceModel.php - Modify the saveBulk method
     public function saveBulk(array $attendanceData, int $markedBy, ?string $markedByName): bool
     {
         try {
             $this->db->beginTransaction();
 
-            $sql = "INSERT INTO attendance 
-                (student_id, class_id, section_id, date, status, remarks, marked_by, marked_by_name) 
-                VALUES (:student_id, :class_id, :section_id, :date, :status, :remarks, :marked_by, :marked_by_name)
-                ON DUPLICATE KEY UPDATE 
-                status = VALUES(status),
-                remarks = VALUES(remarks),
-                section_id = VALUES(section_id),
-                updated_at = CURRENT_TIMESTAMP";
-
-            $stmt = $this->db->prepare($sql);
+            $updatedRecords = [];
+            $insertedRecords = [];
 
             foreach ($attendanceData as $data) {
-                // Handle section_id - can be null
-                $sectionId = isset($data['section_id']) && $data['section_id'] !== ''
+                // Check if record exists
+                $checkSql = "SELECT id, status FROM attendance 
+                        WHERE student_id = :student_id AND date = :date";
+
+                $checkStmt = $this->db->prepare($checkSql);
+                $checkStmt->execute([
+                    ':student_id' => $data['student_id'],
+                    ':date' => $data['date']
+                ]);
+
+                $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    // Record exists - we're updating
+                    $updatedRecords[] = [
+                        'student_id' => $data['student_id'],
+                        'date' => $data['date'],
+                        'old_status' => $existing['status'],
+                        'new_status' => $data['status']
+                    ];
+
+                    // Update existing record
+                    $updateSql = "UPDATE attendance SET 
+                             status = :status,
+                             remarks = :remarks,
+                             marked_by = :marked_by,
+                             marked_by_name = :marked_by_name
+                             WHERE id = :id";
+
+                    $updateStmt = $this->db->prepare($updateSql);
+                    $updateStmt->execute([
+                        ':status' => $data['status'],
+                        ':remarks' => $data['remarks'] ?? null,
+                        ':marked_by' => $markedBy,
+                        ':marked_by_name' => $markedByName,
+                        ':id' => $existing['id']
+                    ]);
+                } else {
+                    // New record
+                    $insertedRecords[] = $data['student_id'];
+
+                    $insertSql = "INSERT INTO attendance 
+                            (student_id, class_id, section_id, date, status, remarks, marked_by, marked_by_name) 
+                            VALUES (:student_id, :class_id, :section_id, :date, :status, :remarks, :marked_by, :marked_by_name)";
+
+                    $insertStmt = $this->db->prepare($insertSql);
+
+                    $sectionId = isset($data['section_id']) && $data['section_id'] !== ''
                     ? $data['section_id']
                     : null;
 
-                $stmt->execute([
+                    $insertStmt->execute([
                     ':student_id' => $data['student_id'],
                     ':class_id' => $data['class_id'],
                     ':section_id' => $sectionId,
@@ -44,8 +83,18 @@ class AttendanceModel
                     ':marked_by_name' => $markedByName,
                 ]);
             }
+            }
 
             $this->db->commit();
+
+            // Log the changes for audit trail
+            if (!empty($updatedRecords)) {
+                error_log("Updated attendance records: " . json_encode($updatedRecords));
+            }
+            if (!empty($insertedRecords)) {
+                error_log("Inserted new attendance records for students: " . implode(', ', $insertedRecords));
+            }
+
             return true;
         } catch (Exception $e) {
             $this->db->rollBack();
