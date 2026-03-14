@@ -24,9 +24,9 @@ class NotificationController
     {
         // Verify admin/school permissions
         $user = JwtHelper::getUserFromToken();
-        
+
         $data = json_decode(file_get_contents("php://input"), true);
-        
+
         $recipientType = $data['recipient_type'] ?? 'single';
         $studentIds = $data['student_ids'] ?? [];
         $classId = $data['class_id'] ?? null;
@@ -34,46 +34,54 @@ class NotificationController
         $title = $data['title'] ?? null;
         $body = $data['body'] ?? null;
         $dataPayload = $data['data'] ?? [];
-        
+
         if (!$title || !$body) {
             Response::json(["message" => "Title and body are required"], 400);
         }
-        
+
         // Add school context for security
         $schoolId = $user['school_id'] ?? null;
-        
+
         $result = ['success' => false, 'sent' => 0, 'failed' => 0];
-        
+
         switch ($recipientType) {
             case 'single':
                 if (empty($studentIds)) {
                     Response::json(["message" => "Student IDs required"], 400);
                 }
+                // Handle single student (first ID)
+                $result = $this->sendToStudents([$studentIds[0]], $title, $body, $dataPayload);
+                break;
+
+            case 'multiple': // Add this case
+                if (empty($studentIds)) {
+                    Response::json(["message" => "Student IDs required"], 400);
+                }
                 $result = $this->sendToStudents($studentIds, $title, $body, $dataPayload);
                 break;
-                
+
             case 'class':
                 if (!$classId) {
                     Response::json(["message" => "Class ID required"], 400);
                 }
                 $result = $this->sendToClass($classId, $title, $body, $dataPayload);
                 break;
-                
+
             case 'section':
                 if (!$classId || !$sectionId) {
                     Response::json(["message" => "Class ID and Section ID required"], 400);
                 }
                 $result = $this->sendToSection($classId, $sectionId, $title, $body, $dataPayload);
                 break;
-                
+
             case 'all':
                 $result = $this->sendToAllSchoolStudents($schoolId, $title, $body, $dataPayload);
                 break;
-                
+
             default:
                 Response::json(["message" => "Invalid recipient type"], 400);
         }
-        
+
         // Log notification for history
         $this->logNotification([
             'school_id' => $schoolId,
@@ -87,7 +95,7 @@ class NotificationController
             'failed_count' => $result['failed'] ?? 0,
             'data' => json_encode($dataPayload)
         ]);
-        
+
         Response::json([
             'success' => true,
             'message' => "Notification sent to {$result['sent']} devices",
