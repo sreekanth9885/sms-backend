@@ -122,7 +122,7 @@ $router->post('/register-device', [$studentAuthController, 'registerDeviceToken'
 // $router->get('/student/profile', [$studentAuthController, 'getProfile']);
 $router->post('/notifications/send', [$notificationController, 'sendNotification']);
 $router->get('/notifications/history', [$notificationController, 'getNotificationHistory']);
-
+$router->post('/auth/select-student', [$studentAuthController, 'selectStudent']);
 // Subject routes
 $router->post('/subjects', [$subjectController, 'create']);
 $router->put('/subjects/(\d+)', [$subjectController, 'update']);
