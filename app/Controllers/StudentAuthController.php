@@ -104,6 +104,67 @@ class StudentAuthController
             "user" => $studentData
         ]);
     }
+    public function selectStudent()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (empty($data['mobile_number'])) {
+            Response::json(["message" => "Mobile number is required"], 400);
+        }
+
+        if (empty($data['student_id'])) {
+            Response::json(["message" => "Student ID is required"], 400);
+        }
+
+        $mobileNumber = $data['mobile_number'];
+        $studentId = $data['student_id'];
+
+        // Find the specific student by ID and verify it belongs to this mobile number
+        $student = $this->findStudentByIdAndMobile($studentId, $mobileNumber);
+
+        if (!$student) {
+            Response::json(["message" => "Student not found or does not belong to this mobile number"], 404);
+        }
+
+        // Generate JWT token for the selected student
+        $token = JwtHelper::generateAccessToken([
+            "id" => $student['id'],
+            "type" => "student",
+            "school_id" => $student['school_id'],
+            "class_id" => $student['class_id'],
+            "section_id" => $student['section_id']
+        ]);
+
+        // Format student data for response
+        $studentData = [
+            "id" => $student['id'],
+            "name" => trim($student['first_name'] . " " . ($student['last_name'] ?? "")),
+            "first_name" => $student['first_name'],
+            "last_name" => $student['last_name'],
+            "admission_number" => $student['admission_number'],
+            "roll_number" => $student['roll_number'],
+            "class_id" => $student['class_id'],
+            "class_name" => $student['class_name'],
+            "section_id" => $student['section_id'],
+            "section_name" => $student['section_name'],
+            "school_id" => $student['school_id'],
+            "father_name" => $student['father_name'],
+            "mother_name" => $student['mother_name'],
+            "parent_phone" => $student['parent_phone'],
+            "alternate_phone" => $student['alternate_phone'],
+            "parent_email" => $student['parent_email'],
+            "photo_url" => $student['photo_url'],
+            "is_active" => (bool)$student['is_active']
+        ];
+
+        Response::json([
+            "success" => true,
+            "message" => "Student selected successfully",
+            "token" => $token,
+            "user" => $studentData
+        ]);
+    }
+
     /**
      * Find ALL students by mobile number
      */
@@ -299,5 +360,29 @@ class StudentAuthController
             'class' => $result ? ['id' => $result['class_id'], 'name' => $result['class_name']] : null,
             'section' => ($result && $result['section_id']) ? ['id' => $result['section_id'], 'name' => $result['section_name']] : null
         ];
+    }
+    /**
+     * Find student by ID and verify it belongs to the mobile number
+     */
+    private function findStudentByIdAndMobile($studentId, $mobileNumber)
+    {
+        $sql = "SELECT s.*, 
+                   c.name as class_name, 
+                   sec.name as section_name
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN sections sec ON s.section_id = sec.id
+            WHERE s.id = :student_id 
+            AND (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
+            AND s.is_active = 1
+            LIMIT 1";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            ':student_id' => $studentId,
+            ':mobile' => $mobileNumber
+        ]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
