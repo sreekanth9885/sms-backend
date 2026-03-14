@@ -26,20 +26,46 @@ class StudentAuthController
     public function studentLogin()
     {
         $data = json_decode(file_get_contents("php://input"), true);
-        
+
         if (empty($data['mobile_number'])) {
             Response::json(["message" => "Mobile number is required"], 400);
         }
-        
+
         $mobileNumber = $data['mobile_number'];
-        
-        // Find student by parent_phone or alternate_phone
-        $student = $this->findStudentByMobile($mobileNumber);
-        
-        if (!$student) {
+
+        // Find ALL students by parent_phone or alternate_phone
+        $students = $this->findAllStudentsByMobile($mobileNumber);
+
+        if (empty($students)) {
             Response::json(["message" => "No account found with this mobile number"], 404);
         }
-        
+
+        // If multiple students found, return the list for selection
+        if (count($students) > 1) {
+            $studentList = [];
+            foreach ($students as $student) {
+                $studentList[] = [
+                    "id" => $student['id'],
+                    "name" => trim($student['first_name'] . " " . ($student['last_name'] ?? "")),
+                    "class_name" => $student['class_name'] ?? null,
+                    "section_name" => $student['section_name'] ?? null,
+                    "admission_number" => $student['admission_number'],
+                    "roll_number" => $student['roll_number'],
+                    "photo_url" => $student['photo_url']
+                ];
+            }
+
+            Response::json([
+                "success" => true,
+                "multiple_accounts" => true,
+                "message" => "Multiple accounts found. Please select one.",
+                "students" => $studentList
+            ]);
+        }
+
+        // Single student found - proceed with login
+        $student = $students[0];
+
         // Generate JWT token for student
         $token = JwtHelper::generateAccessToken([
             "id" => $student['id'],
@@ -48,7 +74,7 @@ class StudentAuthController
             "class_id" => $student['class_id'],
             "section_id" => $student['section_id']
         ]);
-        
+
         // Format student data for response
         $studentData = [
             "id" => $student['id'],
@@ -58,7 +84,9 @@ class StudentAuthController
             "admission_number" => $student['admission_number'],
             "roll_number" => $student['roll_number'],
             "class_id" => $student['class_id'],
+            "class_name" => $student['class_name'],
             "section_id" => $student['section_id'],
+            "section_name" => $student['section_name'],
             "school_id" => $student['school_id'],
             "father_name" => $student['father_name'],
             "mother_name" => $student['mother_name'],
@@ -68,13 +96,33 @@ class StudentAuthController
             "photo_url" => $student['photo_url'],
             "is_active" => (bool)$student['is_active']
         ];
-        
+
         Response::json([
             "success" => true,
             "message" => "Login successful",
             "token" => $token,
             "user" => $studentData
         ]);
+    }
+    /**
+     * Find ALL students by mobile number
+     */
+    private function findAllStudentsByMobile($mobileNumber)
+    {
+        $sql = "SELECT s.*, 
+                   c.name as class_name, 
+                   sec.name as section_name
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN sections sec ON s.section_id = sec.id
+            WHERE (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
+            AND s.is_active = 1
+            ORDER BY s.id";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':mobile' => $mobileNumber]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     /**
