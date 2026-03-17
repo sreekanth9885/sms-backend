@@ -221,50 +221,98 @@ class NotificationController
         
         return ['sent' => $totalSent, 'failed' => $totalFailed];
     }
-    
-    /**
-     * Get notification history
-     * GET /api/notifications/history
-     */
+
     public function getNotificationHistory()
     {
-        $user = JwtHelper::getUserFromToken();
-        $schoolId = $user['school_id'] ?? null;
-        
+        // Use mobile token verification for student access
+        $user = JwtHelper::getUserFromTokenMobile();
+
+        if (!$user || $user['type'] !== 'student') {
+            Response::json(["message" => "Unauthorized"], 401);
+        }
+
+        $studentId = $user['id'];
+        $schoolId = $user['school_id'];
+        $classId = $user['class_id'];
+        $sectionId = $user['section_id'];
+
         $page = $_GET['page'] ?? 1;
         $limit = $_GET['limit'] ?? 20;
         $offset = ($page - 1) * $limit;
-        
-        // Check if table exists first
+
         try {
+            // Get all notifications for this school
             $stmt = $this->db->prepare("
-                SELECT * FROM notification_history 
-                WHERE school_id = ? 
-                ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?
-            ");
-            $stmt->execute([$schoolId, (int)$limit, (int)$offset]);
-            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Get total count
-            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM notification_history WHERE school_id = ?");
-            $countStmt->execute([$schoolId]);
-            $total = $countStmt->fetchColumn();
-            
+            SELECT * FROM notification_history 
+            WHERE school_id = ? 
+            ORDER BY created_at DESC
+        ");
+
+            $stmt->execute([$schoolId]);
+            $allNotifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Filter notifications relevant to this student
+            $filteredNotifications = [];
+
+            foreach ($allNotifications as $notification) {
+                $include = false;
+
+                // Check based on recipient type
+                if ($notification['recipient_type'] === 'all') {
+                    // School-wide notifications
+                    $include = true;
+                } elseif ($notification['recipient_type'] === 'class' && $notification['class_id'] == $classId) {
+                    // Class-specific notifications
+                    $include = true;
+                } elseif (
+                    $notification['recipient_type'] === 'section' &&
+                    $notification['class_id'] == $classId &&
+                    $notification['section_id'] == $sectionId
+                ) {
+                    // Section-specific notifications
+                    $include = true;
+                } elseif ($notification['recipient_type'] === 'single') {
+                    // Personal notifications - check if this student is in the student_ids array
+                    $data = json_decode($notification['data'], true);
+
+                    // Check if student_ids exists and contains this student
+                    if (isset($data['student_ids']) && is_array($data['student_ids'])) {
+                        if (in_array($studentId, $data['student_ids'])) {
+                            $include = true;
+                        }
+                    }
+                    // Also check if maybe a single student_id is stored directly
+                    elseif (isset($data['student_id']) && $data['student_id'] == $studentId) {
+                        $include = true;
+                    }
+                }
+
+                if ($include) {
+                    $filteredNotifications[] = $notification;
+                }
+            }
+
+            // Apply pagination to filtered results
+            $total = count($filteredNotifications);
+            $paginatedHistory = array_slice($filteredNotifications, $offset, $limit);
+
             Response::json([
-                'history' => $history,
-                'total' => (int)$total,
+                'success' => true,
+                'history' => $paginatedHistory,
+                'total' => $total,
                 'page' => (int)$page,
                 'pages' => ceil($total / $limit)
             ]);
         } catch (PDOException $e) {
-            // Table might not exist yet
+            error_log("Database error in getNotificationHistory: " . $e->getMessage());
             Response::json([
+                'success' => false,
+                'message' => 'Failed to fetch notifications',
                 'history' => [],
                 'total' => 0,
                 'page' => (int)$page,
                 'pages' => 0
-            ]);
+            ], 500);
         }
     }
     
