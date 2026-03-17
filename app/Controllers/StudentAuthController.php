@@ -1,6 +1,4 @@
 <?php
-// controllers/StudentAuthController.php
-
 require_once __DIR__ . '/../Core/Response.php';
 require_once __DIR__ . '/../Helpers/JwtHelper.php';
 require_once __DIR__ . '/../Models/StudentModel.php';
@@ -32,9 +30,10 @@ class StudentAuthController
         }
 
         $mobileNumber = $data['mobile_number'];
+        $schoolId = $data['school_id'] ?? null; // Optional school_id filter
 
-        // Find ALL students by parent_phone or alternate_phone
-        $students = $this->findAllStudentsByMobile($mobileNumber);
+        // Find ALL students by mobile number, optionally filtered by school
+        $students = $this->findAllStudentsByMobile($mobileNumber, $schoolId);
 
         if (empty($students)) {
             Response::json(["message" => "No account found with this mobile number"], 404);
@@ -51,7 +50,8 @@ class StudentAuthController
                     "section_name" => $student['section_name'] ?? null,
                     "admission_number" => $student['admission_number'],
                     "roll_number" => $student['roll_number'],
-                    "photo_url" => $student['photo_url']
+                    "photo_url" => $student['photo_url'],
+                    "school_id" => $student['school_id'] // Include school_id in response
                 ];
             }
 
@@ -116,14 +116,19 @@ class StudentAuthController
             Response::json(["message" => "Student ID is required"], 400);
         }
 
+        if (empty($data['school_id'])) {
+            Response::json(["message" => "School ID is required"], 400);
+        }
+
         $mobileNumber = $data['mobile_number'];
         $studentId = $data['student_id'];
+        $schoolId = $data['school_id'];
 
-        // Find the specific student by ID and verify it belongs to this mobile number
-        $student = $this->findStudentByIdAndMobile($studentId, $mobileNumber);
+        // Find the specific student by ID and verify it belongs to this mobile number and school
+        $student = $this->findStudentByIdAndMobile($studentId, $mobileNumber, $schoolId);
 
         if (!$student) {
-            Response::json(["message" => "Student not found or does not belong to this mobile number"], 404);
+            Response::json(["message" => "Student not found or does not belong to this mobile number/school"], 404);
         }
 
         // Generate JWT token for the selected student
@@ -168,20 +173,29 @@ class StudentAuthController
     /**
      * Find ALL students by mobile number
      */
-    private function findAllStudentsByMobile($mobileNumber)
+    private function findAllStudentsByMobile($mobileNumber, $schoolId = null)
     {
         $sql = "SELECT s.*, 
-                   c.name as class_name, 
-                   sec.name as section_name
-            FROM students s
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN sections sec ON s.section_id = sec.id
-            WHERE (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
-            AND s.is_active = 1
-            ORDER BY s.id";
+               c.name as class_name, 
+               sec.name as section_name
+        FROM students s
+        LEFT JOIN classes c ON s.class_id = c.id
+        LEFT JOIN sections sec ON s.section_id = sec.id
+        WHERE (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
+        AND s.is_active = 1";
+
+        // Add school filter if provided
+        $params = [':mobile' => $mobileNumber];
+
+        if ($schoolId) {
+            $sql .= " AND s.school_id = :school_id";
+            $params[':school_id'] = $schoolId;
+        }
+
+        $sql .= " ORDER BY s.id";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([':mobile' => $mobileNumber]);
+        $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -251,68 +265,7 @@ class StudentAuthController
         "message" => "Device token registered successfully"
     ]);
 }
-    
-    /**
-     * Get Student Profile
-     * GET /student/profile
-     */
-    // public function getProfile()
-    // {
-    //     $user = JwtHelper::getUserFromTokenMobile();
-        
-    //     if (!$user || $user['type'] !== 'student') {
-    //         Response::json(["message" => "Unauthorized"], 401);
-    //     }
-        
-    //     $student = $this->student->findById($user['id']);
-        
-    //     if (!$student) {
-    //         Response::json(["message" => "Student not found"], 404);
-    //     }
-        
-    //     // Get class and section details
-    //     $classSection = $this->getClassSectionDetails($student['class_id'], $student['section_id']);
-        
-    //     $profile = [
-    //         "id" => $student['id'],
-    //         "name" => trim($student['first_name'] . " " . ($student['last_name'] ?? "")),
-    //         "first_name" => $student['first_name'],
-    //         "last_name" => $student['last_name'],
-    //         "admission_number" => $student['admission_number'],
-    //         "roll_number" => $student['roll_number'],
-    //         "date_of_admission" => $student['date_of_admission'],
-    //         "gender" => $student['gender'],
-    //         "dob" => $student['dob'],
-    //         "blood_group" => $student['blood_group'],
-    //         "religion" => $student['religion'],
-    //         "caste" => $student['caste'],
-    //         "class" => $classSection['class'] ?? null,
-    //         "section" => $classSection['section'] ?? null,
-    //         "father_name" => $student['father_name'],
-    //         "mother_name" => $student['mother_name'],
-    //         "parent_phone" => $student['parent_phone'],
-    //         "alternate_phone" => $student['alternate_phone'],
-    //         "parent_email" => $student['parent_email'],
-    //         "address" => [
-    //             "village" => $student['village'],
-    //             "district" => $student['district'],
-    //             "state" => $student['state'],
-    //             "country" => $student['country'],
-    //             "pincode" => $student['pincode'],
-    //             "complete_address" => $student['complete_address']
-    //         ],
-    //         "identification_marks" => [
-    //             "mark_1" => $student['identification_mark_1'],
-    //             "mark_2" => $student['identification_mark_2']
-    //         ],
-    //         "photo_url" => $student['photo_url'],
-    //         "school_id" => $student['school_id'],
-    //         "is_active" => (bool)$student['is_active']
-    //     ];
-        
-    //     Response::json($profile);
-    // }
-    
+
     /**
      * Find student by mobile number (parent_phone or alternate_phone)
      */
@@ -364,23 +317,25 @@ class StudentAuthController
     /**
      * Find student by ID and verify it belongs to the mobile number
      */
-    private function findStudentByIdAndMobile($studentId, $mobileNumber)
+    private function findStudentByIdAndMobile($studentId, $mobileNumber, $schoolId)
     {
         $sql = "SELECT s.*, 
-                   c.name as class_name, 
-                   sec.name as section_name
-            FROM students s
-            LEFT JOIN classes c ON s.class_id = c.id
-            LEFT JOIN sections sec ON s.section_id = sec.id
-            WHERE s.id = :student_id 
-            AND (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
-            AND s.is_active = 1
-            LIMIT 1";
+               c.name as class_name, 
+               sec.name as section_name
+        FROM students s
+        LEFT JOIN classes c ON s.class_id = c.id
+        LEFT JOIN sections sec ON s.section_id = sec.id
+        WHERE s.id = :student_id 
+        AND (s.parent_phone = :mobile OR s.alternate_phone = :mobile)
+        AND s.school_id = :school_id
+        AND s.is_active = 1
+        LIMIT 1";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             ':student_id' => $studentId,
-            ':mobile' => $mobileNumber
+            ':mobile' => $mobileNumber,
+            ':school_id' => $schoolId
         ]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);

@@ -24,7 +24,8 @@ class NotificationController
     {
         // Verify admin/school permissions
         $user = JwtHelper::getUserFromToken();
-
+        $userId = $user['id'] ?? null;
+        $schoolId = $user['school_id'] ?? null;
         $data = json_decode(file_get_contents("php://input"), true);
 
         $recipientType = $data['recipient_type'] ?? 'single';
@@ -39,9 +40,6 @@ class NotificationController
             Response::json(["message" => "Title and body are required"], 400);
         }
 
-        // Add school context for security
-        $schoolId = $user['school_id'] ?? null;
-
         $result = ['success' => false, 'sent' => 0, 'failed' => 0];
 
         switch ($recipientType) {
@@ -49,52 +47,42 @@ class NotificationController
                 if (empty($studentIds)) {
                     Response::json(["message" => "Student IDs required"], 400);
                 }
-                // Handle single student (first ID)
-                $result = $this->sendToStudents([$studentIds[0]], $title, $body, $dataPayload);
+                // Pass schoolId to sendToStudents
+                $result = $this->sendToStudents([$studentIds[0]], $title, $body, $dataPayload, $userId, $schoolId);
                 break;
 
-            case 'multiple': // Add this case
+            case 'multiple':
                 if (empty($studentIds)) {
                     Response::json(["message" => "Student IDs required"], 400);
                 }
-                $result = $this->sendToStudents($studentIds, $title, $body, $dataPayload);
+                // Pass schoolId to sendToStudents
+                $result = $this->sendToStudents($studentIds, $title, $body, $dataPayload, $userId, $schoolId);
                 break;
 
             case 'class':
                 if (!$classId) {
                     Response::json(["message" => "Class ID required"], 400);
                 }
-                $result = $this->sendToClass($classId, $title, $body, $dataPayload);
+                $result = $this->sendToClass($classId, $title, $body, $dataPayload, $userId, $schoolId);
                 break;
 
             case 'section':
                 if (!$classId || !$sectionId) {
                     Response::json(["message" => "Class ID and Section ID required"], 400);
                 }
-                $result = $this->sendToSection($classId, $sectionId, $title, $body, $dataPayload);
+                $result = $this->sendToSection($classId, $sectionId, $title, $body, $dataPayload, $userId, $schoolId);
                 break;
 
             case 'all':
-                $result = $this->sendToAllSchoolStudents($schoolId, $title, $body, $dataPayload);
+                $result = $this->sendToAllSchoolStudents($schoolId, $title, $body, $dataPayload, $userId);
                 break;
 
             default:
                 Response::json(["message" => "Invalid recipient type"], 400);
         }
 
-        // Log notification for history
-        $this->logNotification([
-            'school_id' => $schoolId,
-            'created_by' => $user['id'],
-            'title' => $title,
-            'body' => $body,
-            'recipient_type' => $recipientType,
-            'class_id' => $classId,
-            'section_id' => $sectionId,
-            'sent_count' => $result['sent'] ?? 0,
-            'failed_count' => $result['failed'] ?? 0,
-            'data' => json_encode($dataPayload)
-        ]);
+        // ❌ REMOVE THIS - it's causing duplicate entries with missing student_ids
+        // $this->logNotification([...]);
 
         Response::json([
             'success' => true,
@@ -102,29 +90,67 @@ class NotificationController
             'details' => $result
         ]);
     }
-    
+
     /**
-     * Send to specific students by IDs
+     * Send notification to specific students
      */
-    private function sendToStudents($studentIds, $title, $body, $dataPayload)
+    private function sendToStudents($studentIds, $title, $body, $dataPayload, $userId = null, $schoolId = null)
     {
-        // Get tokens for these students - USING device_tokens TABLE
+        // REMOVE THIS LINE - it's overriding the passed userId
+        // $user = JwtHelper::getUserFromToken();
+
+        // Get tokens for these students
         $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
         $stmt = $this->db->prepare("
-            SELECT token 
-            FROM device_tokens 
-            WHERE student_id IN ($placeholders) 
-            AND last_used_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-        ");
+        SELECT token, student_id 
+        FROM device_tokens 
+        WHERE student_id IN ($placeholders) 
+        AND last_used_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
+    ");
         $stmt->execute($studentIds);
-        $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $tokens = array_column($results, 'token');
+        $recipientStudentIds = array_column($results, 'student_id');
+
+        // Prepare history data with student_ids
+        $historyData = $dataPayload;
+        $historyData['student_ids'] = !empty($recipientStudentIds) ? $recipientStudentIds : $studentIds;
+
         if (empty($tokens)) {
+            // Log notification even if no active devices
+            $this->logNotification([
+                'school_id' => $schoolId,
+                'created_by' => $userId, // Use the passed userId (admin ID)
+                'title' => $title,
+                'body' => $body,
+                'recipient_type' => 'single',
+                'class_id' => null,
+                'section_id' => null,
+                'sent_count' => 0,
+                'failed_count' => 0,
+                'data' => json_encode($historyData)
+            ]);
+
             return ['sent' => 0, 'failed' => 0, 'message' => 'No active devices'];
         }
-        
+
         $response = $this->firebaseService->sendToMultipleDevices($tokens, $title, $body, $dataPayload);
-        
+
+        // Log notification with student IDs in data
+        $this->logNotification([
+            'school_id' => $schoolId,
+            'created_by' => $userId, // Use the passed userId (admin ID)
+            'title' => $title,
+            'body' => $body,
+            'recipient_type' => 'single',
+            'class_id' => null,
+            'section_id' => null,
+            'sent_count' => $response['success'] ?? 0,
+            'failed_count' => ($response['failed'] ?? 0) + ($response['error'] ?? 0),
+            'data' => json_encode($historyData)
+        ]);
+
         return [
             'sent' => $response['success'] ?? 0,
             'failed' => ($response['failed'] ?? 0) + ($response['error'] ?? 0)
@@ -228,43 +254,96 @@ class NotificationController
      */
     public function getNotificationHistory()
     {
-        $user = JwtHelper::getUserFromToken();
-        $schoolId = $user['school_id'] ?? null;
-        
+        // Use the mobile token verification instead of admin token
+        $user = JwtHelper::getUserFromTokenMobile();
+
+        if (!$user || $user['type'] !== 'student') {
+            Response::json(["message" => "Unauthorized"], 401);
+        }
+
+        $studentId = $user['id'];
+        $schoolId = $user['school_id'];
+        $classId = $user['class_id'];
+        $sectionId = $user['section_id'];
+
         $page = $_GET['page'] ?? 1;
         $limit = $_GET['limit'] ?? 20;
         $offset = ($page - 1) * $limit;
-        
-        // Check if table exists first
+
         try {
+            // First, let's get all notifications and filter in PHP to avoid syntax issues
+            // This is more reliable across different MySQL/MariaDB versions
+
+            // Get all notifications for this school
             $stmt = $this->db->prepare("
-                SELECT * FROM notification_history 
-                WHERE school_id = ? 
-                ORDER BY created_at DESC 
-                LIMIT ? OFFSET ?
-            ");
-            $stmt->execute([$schoolId, (int)$limit, (int)$offset]);
-            $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Get total count
-            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM notification_history WHERE school_id = ?");
-            $countStmt->execute([$schoolId]);
-            $total = $countStmt->fetchColumn();
-            
+            SELECT * FROM notification_history 
+            WHERE school_id = ? 
+            ORDER BY created_at DESC
+        ");
+
+            $stmt->execute([$schoolId]);
+            $allNotifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Filter notifications that are relevant to this student
+            $filteredNotifications = [];
+
+            foreach ($allNotifications as $notification) {
+                $include = false;
+
+                // Check based on recipient type
+                if ($notification['recipient_type'] === 'all') {
+                    $include = true;
+                } elseif ($notification['recipient_type'] === 'class' && $notification['class_id'] == $classId) {
+                    $include = true;
+                } elseif (
+                    $notification['recipient_type'] === 'section' &&
+                    $notification['class_id'] == $classId &&
+                    $notification['section_id'] == $sectionId
+                ) {
+                    $include = true;
+                } elseif ($notification['recipient_type'] === 'single') {
+                    // Parse the data JSON and check for student_ids
+                    $data = json_decode($notification['data'], true);
+
+                    // Check if student_ids exists and contains this student
+                    if (isset($data['student_ids']) && is_array($data['student_ids'])) {
+                        if (in_array($studentId, $data['student_ids'])) {
+                            $include = true;
+                        }
+                    }
+                    // Also check if maybe a single student_id is stored directly
+                    elseif (isset($data['student_id']) && $data['student_id'] == $studentId) {
+                        $include = true;
+                    }
+                }
+
+                if ($include) {
+                    $filteredNotifications[] = $notification;
+                }
+            }
+
+            // Apply pagination to filtered results
+            $total = count($filteredNotifications);
+            $paginatedHistory = array_slice($filteredNotifications, $offset, $limit);
+
             Response::json([
-                'history' => $history,
-                'total' => (int)$total,
+                'success' => true,
+                'history' => $paginatedHistory,
+                'total' => $total,
                 'page' => (int)$page,
                 'pages' => ceil($total / $limit)
             ]);
         } catch (PDOException $e) {
-            // Table might not exist yet
+            error_log("Database error: " . $e->getMessage());
             Response::json([
+                'success' => false,
+                'error' => true,
+                'message' => 'Database error: ' . $e->getMessage(),
                 'history' => [],
                 'total' => 0,
                 'page' => (int)$page,
                 'pages' => 0
-            ]);
+            ], 500);
         }
     }
     
