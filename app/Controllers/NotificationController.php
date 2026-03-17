@@ -43,6 +43,7 @@ class NotificationController
         $schoolId = $user['school_id'] ?? null;
 
         $result = ['success' => false, 'sent' => 0, 'failed' => 0];
+        $actualRecipientIds = []; // To store actual recipients who have devices
 
         switch ($recipientType) {
             case 'single':
@@ -50,36 +51,45 @@ class NotificationController
                     Response::json(["message" => "Student IDs required"], 400);
                 }
                 // Handle single student (first ID)
-                $result = $this->sendToStudents([$studentIds[0]], $title, $body, $dataPayload);
+                $result = $this->sendToStudents([$studentIds[0]], $title, $body, $dataPayload, $actualRecipientIds);
                 break;
 
-            case 'multiple': // Add this case
+            case 'multiple':
                 if (empty($studentIds)) {
                     Response::json(["message" => "Student IDs required"], 400);
                 }
-                $result = $this->sendToStudents($studentIds, $title, $body, $dataPayload);
+                $result = $this->sendToStudents($studentIds, $title, $body, $dataPayload, $actualRecipientIds);
                 break;
 
             case 'class':
                 if (!$classId) {
                     Response::json(["message" => "Class ID required"], 400);
                 }
-                $result = $this->sendToClass($classId, $title, $body, $dataPayload);
+                $result = $this->sendToClass($classId, $title, $body, $dataPayload, $actualRecipientIds);
                 break;
 
             case 'section':
                 if (!$classId || !$sectionId) {
                     Response::json(["message" => "Class ID and Section ID required"], 400);
                 }
-                $result = $this->sendToSection($classId, $sectionId, $title, $body, $dataPayload);
+                $result = $this->sendToSection($classId, $sectionId, $title, $body, $dataPayload, $actualRecipientIds);
                 break;
 
             case 'all':
-                $result = $this->sendToAllSchoolStudents($schoolId, $title, $body, $dataPayload);
+                $result = $this->sendToAllSchoolStudents($schoolId, $title, $body, $dataPayload, $actualRecipientIds);
                 break;
 
             default:
                 Response::json(["message" => "Invalid recipient type"], 400);
+        }
+
+        // Prepare data for history - ADD STUDENT IDs TO DATA PAYLOAD
+        $historyData = $dataPayload;
+        if (!empty($actualRecipientIds)) {
+            $historyData['student_ids'] = $actualRecipientIds;
+        } else if (!empty($studentIds) && $recipientType !== 'all') {
+            // If no actual recipients but we have intended recipients, store intended
+            $historyData['student_ids'] = $studentIds;
         }
 
         // Log notification for history
@@ -93,7 +103,7 @@ class NotificationController
             'section_id' => $sectionId,
             'sent_count' => $result['sent'] ?? 0,
             'failed_count' => $result['failed'] ?? 0,
-            'data' => json_encode($dataPayload)
+            'data' => json_encode($historyData) // Now includes student_ids
         ]);
 
         Response::json([
@@ -106,31 +116,37 @@ class NotificationController
     /**
      * Send to specific students by IDs
      */
-    private function sendToStudents($studentIds, $title, $body, $dataPayload)
+    private function sendToStudents($studentIds, $title, $body, $dataPayload, &$actualRecipientIds = [])
     {
-        // Get tokens for these students - USING device_tokens TABLE
+        // Get tokens AND student_ids for these students
         $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
         $stmt = $this->db->prepare("
-            SELECT token 
-            FROM device_tokens 
-            WHERE student_id IN ($placeholders) 
-            AND last_used_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-        ");
+        SELECT token, student_id 
+        FROM device_tokens 
+        WHERE student_id IN ($placeholders) 
+        AND last_used_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
+    ");
         $stmt->execute($studentIds);
-        $tokens = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $tokens = array_column($results, 'token');
+        $actualRecipientIds = array_column($results, 'student_id'); // Store actual recipients
+
         if (empty($tokens)) {
+            // Still set intended recipients
+            $actualRecipientIds = $studentIds;
             return ['sent' => 0, 'failed' => 0, 'message' => 'No active devices'];
         }
-        
+
         $response = $this->firebaseService->sendToMultipleDevices($tokens, $title, $body, $dataPayload);
-        
+
         return [
             'sent' => $response['success'] ?? 0,
             'failed' => ($response['failed'] ?? 0) + ($response['error'] ?? 0)
         ];
     }
-    
+
+
     /**
      * Send to entire class
      */
