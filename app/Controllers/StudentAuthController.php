@@ -116,9 +116,9 @@ class StudentAuthController
             Response::json(["message" => "Student ID is required"], 400);
         }
 
-        // if (empty($data['school_id'])) {
-        //     Response::json(["message" => "School ID is required"], 400);
-        // }
+        if (empty($data['school_id'])) {
+            Response::json(["message" => "School ID is required"], 400);
+        }
 
         $mobileNumber = $data['mobile_number'];
         $studentId = $data['student_id'];
