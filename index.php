@@ -26,6 +26,7 @@ require_once __DIR__ . '/app/Controllers/AttendanceController.php';
 require_once __DIR__ . '/app/Controllers/StudentAuthController.php';
 require_once __DIR__ . '/app/Controllers/NotificationController.php';
 require_once __DIR__ . '/app/Controllers/SubjectController.php';
+require_once __DIR__ . '/app/Controllers/SubjectDefaultsController.php';
 
 $router = new Router();
 
@@ -44,6 +45,7 @@ $attendanceController = new AttendanceController($pdo);
 $studentAuthController = new StudentAuthController($pdo);
 $notificationController = new NotificationController($pdo);
 $subjectController = new SubjectController($pdo);
+$subjectDefaultsController = new SubjectDefaultsController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -133,4 +135,7 @@ $router->get('/subjects', [$subjectController, 'getAll']);
 $router->get('/subjects/summary', [$subjectController, 'getSummary']);
 $router->post('/subjects/bulk', [$subjectController, 'bulkCreate']);
 $router->post('/subjects/reorder', [$subjectController, 'reorderPriorities']);
+
+$router->get('/subject-defaults', [$subjectDefaultsController, 'getAll']);
+$router->get('/subject-defaults/{id}', [$subjectDefaultsController, 'get']);
 $router->dispatch();
