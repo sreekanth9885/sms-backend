@@ -86,7 +86,7 @@ class NotificationController
         // Prepare data for history - ADD STUDENT IDs TO DATA PAYLOAD
         $historyData = $dataPayload;
         if (!empty($actualRecipientIds)) {
-            $historyData['student_ids'] = $actualRecipientIds;
+            $historyData['student_ids'] = array_unique($actualRecipientIds);
         } else if (!empty($studentIds) && $recipientType !== 'all') {
             // If no actual recipients but we have intended recipients, store intended
             $historyData['student_ids'] = $studentIds;
@@ -287,18 +287,14 @@ class NotificationController
                 ) {
                     // Section-specific notifications
                     $include = true;
-                } elseif ($notification['recipient_type'] === 'single') {
-                    // Personal notifications - check if this student is in the student_ids array
+                } elseif (in_array($notification['recipient_type'], ['single', 'multiple'])) {
                     $data = json_decode($notification['data'], true);
 
-                    // Check if student_ids exists and contains this student
                     if (isset($data['student_ids']) && is_array($data['student_ids'])) {
                         if (in_array($studentId, $data['student_ids'])) {
                             $include = true;
                         }
-                    }
-                    // Also check if maybe a single student_id is stored directly
-                    elseif (isset($data['student_id']) && $data['student_id'] == $studentId) {
+                    } elseif (isset($data['student_id']) && $data['student_id'] == $studentId) {
                         $include = true;
                     }
                 }
