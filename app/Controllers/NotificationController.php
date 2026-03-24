@@ -86,7 +86,7 @@ class NotificationController
         // Prepare data for history - ADD STUDENT IDs TO DATA PAYLOAD
         $historyData = $dataPayload;
         if (!empty($actualRecipientIds)) {
-            $historyData['student_ids'] = array_unique($actualRecipientIds);
+            $historyData['student_ids'] = array_values(array_unique($actualRecipientIds));
         } else if (!empty($studentIds) && $recipientType !== 'all') {
             // If no actual recipients but we have intended recipients, store intended
             $historyData['student_ids'] = $studentIds;
