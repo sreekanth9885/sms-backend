@@ -21,26 +21,60 @@ class SubjectModel
         $this->validateSubjectData($data);
 
         // Check if subject already exists for this class
-        if ($this->subjectExists($data['class_id'], $data['subject_name'])) {
-            throw new Exception("Subject '{$data['subject_name']}' already exists for this class");
-        }
+        // if ($this->subjectExists($data['class_id'], $data['subject_id'])) {
+        //     throw new Exception("Subject '{$data['subject_name']}' already exists for this class");
+        // }
 
         // Check priority uniqueness within class
-        if ($this->priorityExists($data['class_id'], $data['priority'])) {
-            throw new Exception("Priority {$data['priority']} is already assigned to another subject in this class");
-        }
+        // if ($this->priorityExists($data['class_id'], $data['priority'])) {
+        //     throw new Exception("Priority {$data['priority']} is already assigned to another subject in this class");
+        // }
 
-        $sql = "INSERT INTO submaster (class_id, subject_name, priority, fa_max, sa_max, created_at) 
-                VALUES (:class_id, :subject_name, :priority, :fa_max, :sa_max, NOW())";
+        $sql = "INSERT INTO submaster (
+    class_id,
+    subject_id,
+    subject_name,
+    category,
+    type,
+    language_level,
+    group_id,
+    priority,
+    fa_max,
+    sa_max,
+    status,
+    created_at
+) VALUES (
+    :class_id,
+    :subject_id,
+    :subject_name,
+    :category,
+    :type,
+    :language_level,
+    :group_id,
+    :priority,
+    :fa_max,
+    :sa_max,
+    :status,
+    NOW()
+)";
 
         $stmt = $this->db->prepare($sql);
         
         $stmt->execute([
             ':class_id' => $data['class_id'],
+            ':subject_id' => $data['subject_id'],
             ':subject_name' => strtoupper(trim($data['subject_name'])),
+
+            ':category' => $data['category'],
+            ':type' => $data['type'],
+            ':language_level' => $data['language_level'],
+            ':group_id' => $data['group_id'],
+
             ':priority' => $data['priority'],
             ':fa_max' => $data['fa_max'] ?? self::DEFAULT_FA_MAX,
-            ':sa_max' => $data['sa_max'] ?? self::DEFAULT_SA_MAX
+            ':sa_max' => $data['sa_max'] ?? self::DEFAULT_SA_MAX,
+
+            ':status' => $data['status']
         ]);
 
         $id = $this->db->lastInsertId();
@@ -63,9 +97,9 @@ class SubjectModel
 
         if (isset($data['subject_name'])) {
             $data['subject_name'] = strtoupper(trim($data['subject_name']));
-            
+
             // Check if new name conflicts with existing subject (excluding current)
-            if ($this->subjectExists($existing['class_id'], $data['subject_name'], $id)) {
+            if ($this->subjectExists($existing['class_id'], $data['subject_id'], $id)) {
                 throw new Exception("Subject '{$data['subject_name']}' already exists for this class");
             }
             $updateData['subject_name'] = $data['subject_name'];
@@ -73,11 +107,11 @@ class SubjectModel
 
         if (isset($data['priority'])) {
             $this->validatePriority($data['priority']);
-            
+
             // Check if new priority conflicts (excluding current)
-            if ($this->priorityExists($existing['class_id'], $data['priority'], $id)) {
-                throw new Exception("Priority {$data['priority']} is already assigned to another subject in this class");
-            }
+            // if ($this->priorityExists($existing['class_id'], $data['priority'], $id)) {
+            //     throw new Exception("Priority {$data['priority']} is already assigned to another subject in this class");
+            // }
             $updateData['priority'] = $data['priority'];
         }
 
@@ -345,8 +379,8 @@ class SubjectModel
             throw new Exception("Class ID is required");
         }
 
-        if (empty($data['subject_name'])) {
-            throw new Exception("Subject name is required");
+        if (empty($data['subject_id'])) {
+            throw new Exception("Subject is required");
         }
 
         if (strlen($data['subject_name']) > 150) {
@@ -389,15 +423,15 @@ class SubjectModel
         }
     }
 
-    private function subjectExists(int $classId, string $subjectName, int $excludeId = null): bool
+    private function subjectExists(int $classId, int $subjectId, int $excludeId = null): bool
     {
         $sql = "SELECT id FROM submaster 
-                WHERE class_id = :class_id 
-                AND subject_name = :subject_name";
-        
+            WHERE class_id = :class_id 
+            AND subject_id = :subject_id";
+
         $params = [
             'class_id' => $classId,
-            'subject_name' => strtoupper(trim($subjectName))
+            'subject_id' => $subjectId
         ];
 
         if ($excludeId !== null) {
@@ -407,7 +441,7 @@ class SubjectModel
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        
+
         return $stmt->fetch() !== false;
     }
 

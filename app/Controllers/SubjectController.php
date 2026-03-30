@@ -24,7 +24,7 @@ class SubjectController
             if (empty($data)) {
                 Response::json(["message" => "No data provided"], 400);
             }
-            $required = ['class_id', 'subject_name'];
+            $required = ['class_id', 'subject_id'];
             foreach ($required as $field) {
                 if (empty($data[$field])) {
                     Response::json(["message" => ucfirst(str_replace('_', ' ', $field)) . " is required"], 422);
