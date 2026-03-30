@@ -17,26 +17,59 @@ class SubjectController
     {
         try {
             $user = JwtHelper::getUserFromToken();
+
             if (!in_array($user['role'], ['ADMIN', 'SUPER_ADMIN'])) {
                 Response::json(["message" => "Forbidden - Insufficient permissions"], 403);
             }
+
             $data = json_decode(file_get_contents("php://input"), true);
+
             if (empty($data)) {
                 Response::json(["message" => "No data provided"], 400);
             }
+
             $required = ['class_id', 'subject_id'];
             foreach ($required as $field) {
                 if (empty($data[$field])) {
                     Response::json(["message" => ucfirst(str_replace('_', ' ', $field)) . " is required"], 422);
                 }
             }
+
             if (!$this->verifyClassAccess($data['class_id'], $user)) {
                 Response::json(["message" => "Invalid class or access denied"], 403);
             }
+
+            // ✅ STEP 1: Create subject
             $subject = $this->subjectModel->create($data);
+
+            // ✅ STEP 2: Fetch students of that class
+            $stmt = $this->db->prepare("SELECT id, admission_number as roll_no, section_id as section FROM students WHERE class_id = ?");
+            $stmt->execute([$data['class_id']]);
+            $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // ✅ STEP 3: Insert into EAF
+            $insertStmt = $this->db->prepare("
+            INSERT IGNORE INTO eaf (
+                student_id, class_id, subject_id,
+                roll_no, section, subject_name
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ");
+
+            foreach ($students as $student) {
+                $insertStmt->execute([
+                    $student['id'],
+                    $data['class_id'],
+                    $subject['id'],
+                    $student['roll_no'] ?? null,
+                    $student['section'] ?? null,
+                    $data['subject_name'] ?? null
+                ]);
+            }
+
             Response::json([
-                "message" => "Subject created successfully",
-                "subject" => $subject
+                "message" => "Subject created & EAF records inserted",
+                "subject" => $subject,
+                "students_processed" => count($students)
             ], 201);
         } catch (Exception $e) {
             Response::json([

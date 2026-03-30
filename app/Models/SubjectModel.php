@@ -74,7 +74,7 @@ class SubjectModel
             ':fa_max' => $data['fa_max'] ?? self::DEFAULT_FA_MAX,
             ':sa_max' => $data['sa_max'] ?? self::DEFAULT_SA_MAX,
 
-            ':status' => $data['status']
+            ':status' => $data['status'] ?? 1
         ]);
 
         $id = $this->db->lastInsertId();
