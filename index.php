@@ -25,8 +25,6 @@ require_once __DIR__ . '/app/Controllers/StudentFeeController.php';
 require_once __DIR__ . '/app/Controllers/AttendanceController.php';
 require_once __DIR__ . '/app/Controllers/StudentAuthController.php';
 require_once __DIR__ . '/app/Controllers/NotificationController.php';
-require_once __DIR__ . '/app/Controllers/SubjectController.php';
-require_once __DIR__ . '/app/Controllers/SubjectDefaultsController.php';
 require_once __DIR__ . '/app/Controllers/EafController.php';
 // require_once __DIR__ . '/app/Controllers/ExamController.php';
 
@@ -46,8 +44,6 @@ $studentFeeController = new StudentFeeController($pdo);
 $attendanceController = new AttendanceController($pdo);
 $studentAuthController = new StudentAuthController($pdo);
 $notificationController = new NotificationController($pdo);
-$subjectController = new SubjectController($pdo);
-$subjectDefaultsController = new SubjectDefaultsController($pdo);
 // $examController = new ExamController($pdo);
 $eafController = new EafController($pdo);
 
@@ -129,19 +125,7 @@ $router->post('/register-device', [$studentAuthController, 'registerDeviceToken'
 $router->post('/notifications/send', [$notificationController, 'sendNotification']);
 $router->get('/notifications/history', [$notificationController, 'getNotificationHistory']);
 $router->post('/auth/select-student', [$studentAuthController, 'selectStudent']);
-// Subject routes
-$router->post('/subjects', [$subjectController, 'create']);
-$router->put('/subjects/(\d+)', [$subjectController, 'update']);
-$router->delete('/subjects/(\d+)', [$subjectController, 'delete']);
-$router->get('/subjects/(\d+)', [$subjectController, 'get']);
-$router->get('/subjects/class/(\d+)', [$subjectController, 'getByClass']);
-$router->get('/subjects', [$subjectController, 'getAll']);
-$router->get('/subjects/summary', [$subjectController, 'getSummary']);
-$router->post('/subjects/bulk', [$subjectController, 'bulkCreate']);
-$router->post('/subjects/reorder', [$subjectController, 'reorderPriorities']);
 
-$router->get('/subject-defaults', [$subjectDefaultsController, 'getAll']);
-$router->get('/subject-defaults/{id}', [$subjectDefaultsController, 'get']);
 $router->get('/eaf', [$eafController, 'getByClass']);
 // $router->get('/exams', [$examController, 'getAll']);
 // $router->get('/exams/{id}', [$examController, 'get']);
