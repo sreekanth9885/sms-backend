@@ -1,42 +1,56 @@
-
 <?php
+
 require_once __DIR__ . '/../Models/EafModel.php';
-require_once __DIR__ . '/../Core/Response.php';
+require_once __DIR__ . '/../Helpers/JwtHelper.php';
 
 class EafController
 {
-    private EafModel $model;
+    private EafModel $eafModel;
+    private PDO $db;
 
     public function __construct(PDO $db)
     {
-        $this->model = new EafModel($db);
+        $this->db = $db;
+        $this->eafModel = new EafModel($db);
     }
 
-    public function getByClass()
+    public function generate()
     {
+        $user = JwtHelper::getUserFromToken();
+
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
+        }
+
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        $classId = $data['class_id'] ?? null;
+        $students = $data['students'] ?? [];
+        $subjects = $data['subjects'] ?? [];
+
+        if (!$classId || empty($students) || empty($subjects)) {
+            Response::json(["message" => "Invalid data"], 422);
+        }
+
         try {
-            $classId = $_GET['class_id'] ?? null;
-            $sectionId = $_GET['section_id'] ?? null;
+            $this->db->beginTransaction();
 
-            if (!$classId) {
-                Response::json(["message" => "Class ID is required"], 422);
-            }
+            $this->eafModel->bulkInsert($classId, $students, $subjects);
 
-            $data = $this->model->getByClass(
-                (int)$classId,
-                $sectionId ? (int)$sectionId : null
-            );
+            $this->db->commit();
 
             Response::json([
-                "total" => count($data),
-                "data" => $data
+                "status" => true,
+                "message" => "EAF generated successfully"
             ]);
 
         } catch (Exception $e) {
+            $this->db->rollBack();
+
             Response::json([
-                "message" => "Failed to fetch EAF data",
-                "error" => $e->getMessage()
-            ], 400);
+                "status" => false,
+                "message" => $e->getMessage()
+            ], 500);
         }
     }
 }

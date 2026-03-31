@@ -20,14 +20,17 @@ class ClassController
         }
 
         $data = json_decode(file_get_contents("php://input"), true);
-
+        if (empty($data['name']) || empty($data['master_class_id'])) {
+            Response::json(["message" => "Name and master class required"], 422);
+        }
         if (empty($data['name'])) {
             Response::json(["message" => "Class name required"], 422);
         }
 
         $classId = $this->classModel->create(
             (int)$user['school_id'],
-            $data['name']
+            $data['name'],
+            (int)$data['master_class_id']
         );
 
         Response::json([

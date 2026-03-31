@@ -1,5 +1,5 @@
-
 <?php
+
 class EafModel
 {
     private PDO $db;
@@ -9,35 +9,40 @@ class EafModel
         $this->db = $db;
     }
 
-    public function getByClass(int $classId, ?int $sectionId = null): array
+    public function bulkInsert(int $classId, array $students, array $subjects): bool
     {
-        $sql = "
-            SELECT 
-                e.*,
-                s.first_name,
-                s.last_name,
-                s.admission_number,
-                s.class_id,
-                s.section_id,
-                c.name as class_name
-            FROM eaf e
-            JOIN students s ON e.student_id = s.id
-            JOIN classes c ON e.class_id = c.id
-            WHERE e.class_id = :class_id
-        ";
+        $stmt = $this->db->prepare("
+            INSERT INTO eaf (
+                student_id,
+                class_id,
+                subject_id,
+                roll_no,
+                subject_name,
+                fa1max,
+                sa1max
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                subject_name = VALUES(subject_name),
+                fa1max = VALUES(fa1max),
+                sa1max = VALUES(sa1max)
+        ");
 
-        $params = ['class_id' => $classId];
+        foreach ($students as $student) {
+            foreach ($subjects as $subject) {
 
-        if ($sectionId) {
-            $sql .= " AND s.section_id = :section_id";
-            $params['section_id'] = $sectionId;
+                $stmt->execute([
+                    $student['id'],
+                    $classId,
+                    $subject['sid'],
+                    $student['roll_number'] ?? null,
+                    $subject['subname'],
+                    $subject['fa'],
+                    $subject['sa']
+                ]);
+            }
         }
 
-        $sql .= " ORDER BY s.id, e.subject_id";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return true;
     }
 }

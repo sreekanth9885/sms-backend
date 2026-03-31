@@ -8,13 +8,13 @@ class ClassModel
         $this->db = $db;
     }
 
-    public function create(int $schoolId, string $name): int
+    public function create(int $schoolId, string $name, int $masterClassId): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO classes (school_id, name)
-            VALUES (?, ?)
-        ");
-        $stmt->execute([$schoolId, $name]);
+        INSERT INTO classes (school_id, name, master_class_id)
+        VALUES (?, ?, ?)
+    ");
+        $stmt->execute([$schoolId, $name, $masterClassId]);
 
         return (int)$this->db->lastInsertId();
     }

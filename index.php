@@ -25,7 +25,9 @@ require_once __DIR__ . '/app/Controllers/StudentFeeController.php';
 require_once __DIR__ . '/app/Controllers/AttendanceController.php';
 require_once __DIR__ . '/app/Controllers/StudentAuthController.php';
 require_once __DIR__ . '/app/Controllers/NotificationController.php';
+require_once __DIR__ . '/app/Controllers/SubjectController.php';
 require_once __DIR__ . '/app/Controllers/EafController.php';
+require_once __DIR__ . '/app/Controllers/MasterClassController.php';
 // require_once __DIR__ . '/app/Controllers/ExamController.php';
 
 $router = new Router();
@@ -44,8 +46,9 @@ $studentFeeController = new StudentFeeController($pdo);
 $attendanceController = new AttendanceController($pdo);
 $studentAuthController = new StudentAuthController($pdo);
 $notificationController = new NotificationController($pdo);
-// $examController = new ExamController($pdo);
+$subjectController = new SubjectController($pdo);
 $eafController = new EafController($pdo);
+$masterClassController = new MasterClassController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -65,7 +68,7 @@ $router->get('/schools', [$schoolController, 'index']);
 $router->get('/schools/{id}', [$schoolController, 'get']);
 $router->post('/schools/{id}', [$schoolController, 'update']);
 $router->delete('/schools/{id}', [$schoolController, 'delete']);
-
+$router->get('/master-classes', [$masterClassController, 'index']);
 $router->get('/classes', [$classController, 'index']);
 $router->post('/classes', [$classController, 'create']);
 $router->delete('/classes/{id}', [$classController, 'delete']);
@@ -125,9 +128,8 @@ $router->post('/register-device', [$studentAuthController, 'registerDeviceToken'
 $router->post('/notifications/send', [$notificationController, 'sendNotification']);
 $router->get('/notifications/history', [$notificationController, 'getNotificationHistory']);
 $router->post('/auth/select-student', [$studentAuthController, 'selectStudent']);
+$router->get('/subjects', [$subjectController, 'index']);
+$router->post('/eaf/generate', [$eafController, 'generate']);
 
-$router->get('/eaf', [$eafController, 'getByClass']);
-// $router->get('/exams', [$examController, 'getAll']);
-// $router->get('/exams/{id}', [$examController, 'get']);
 
 $router->dispatch();
