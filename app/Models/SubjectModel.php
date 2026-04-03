@@ -46,16 +46,17 @@ class SubjectModel
 
     $stmt = $this->db->prepare("
         SELECT 
-            sm.sid,
+            MIN(sm.sid) as sid,
             sm.subname,
-            sm.pri,
-            sm.fa,
-            sm.sa
+            MIN(sm.pri) as pri,
+            MAX(sm.fa) as fa,
+            MAX(sm.sa) as sa
         FROM submaster sm
         INNER JOIN classes c 
             ON c.master_class_id = sm.master_class_id
         WHERE c.id = ?
-        ORDER BY sm.pri ASC
+        GROUP BY sm.subname
+        ORDER BY pri ASC
     ");
 
     $stmt->execute([$classId]);

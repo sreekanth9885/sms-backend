@@ -53,4 +53,41 @@ class EafController
             ], 500);
         }
     }
+    public function getMarks()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
+        }
+
+        $classId = $_GET['class_id'] ?? null;
+        $subjectId = $_GET['subject_id'] ?? null;
+        $examType = $_GET['exam_type'] ?? null;
+
+        if (!$classId || !$subjectId || !$examType) {
+            Response::json(["message" => "Missing params"], 422);
+        }
+
+        $data = $this->eafModel->getMarks($classId, $subjectId, $examType);
+
+        Response::json([
+            "status" => true,
+            "data" => $data
+        ]);
+    }
+    public function saveMarks()
+    {
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        $examType = $data['exam_type'];
+        $records = $data['records'];
+
+        $this->eafModel->updateMarks($examType, $records);
+
+        Response::json([
+            "status" => true,
+            "message" => "Marks saved successfully"
+        ]);
+    }
 }
