@@ -101,12 +101,13 @@ class EafController
         }
 
         $studentId = $_GET['student_id'] ?? null;
+        $rollNo = $_GET['roll_no'] ?? null;
 
-        if (!$studentId) {
-            Response::json(["message" => "Student ID required"], 422);
+        if (!$studentId && !$rollNo) {
+            Response::json(["message" => "Student ID or Roll No required"], 422);
         }
 
-        $data = $this->eafModel->getStudentAllMarks($studentId);
+        $data = $this->eafModel->getStudentAllMarks($studentId, $rollNo);
 
         Response::json([
             "status" => true,

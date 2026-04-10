@@ -25,14 +25,20 @@ class EafModel
                 $rollNo = $student['admission_number'] ?? $student['roll_number'] ?? null;
 
                 foreach ($subjects as $subject) {
-                    $values[] = "(?, ?, ?, ?, ?, ?, ?)";
+                    $values[] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     $params[] = $student['id'];
                     $params[] = $classId;
                     $params[] = $subject['sid'];
                     $params[] = $rollNo;
                     $params[] = $subject['subname'];
-                    $params[] = $subject['fa'];
-                    $params[] = $subject['sa'];
+
+                    $params[] = $subject['fa'] ?? 0; // fa1
+                    $params[] = $subject['fa'] ?? 0; // fa2
+                    $params[] = $subject['fa'] ?? 0; // fa3
+                    $params[] = $subject['fa'] ?? 0; // fa4
+
+                    $params[] = $subject['sa'] ?? 0; // sa1
+                    $params[] = $subject['sa'] ?? 0; // sa2
                 }
             }
 
@@ -42,21 +48,29 @@ class EafModel
 
             foreach ($chunks as $chunkIndex => $chunk) {
                 $query = "INSERT INTO eaf (
-                    student_id,
-                    class_id,
-                    subject_id,
-                    roll_no,
-                    subject_name,
-                    fa1max,
-                    sa1max
-                ) VALUES " . implode(',', $chunk) . "
-                ON DUPLICATE KEY UPDATE
-                    subject_name = VALUES(subject_name),
-                    fa1max = VALUES(fa1max),
-                    sa1max = VALUES(sa1max)";
+    student_id,
+    class_id,
+    subject_id,
+    roll_no,
+    subject_name,
+    fa1max, fa2max, fa3max, fa4max,
+    sa1max, sa2max
+) VALUES " . implode(',', $chunk) . "
+ON DUPLICATE KEY UPDATE
+    subject_name = VALUES(subject_name),
+    fa1max = VALUES(fa1max),
+    fa2max = VALUES(fa2max),
+    fa3max = VALUES(fa3max),
+    fa4max = VALUES(fa4max),
+    sa1max = VALUES(sa1max),
+    sa2max = VALUES(sa2max)";
 
                 // Calculate params for this chunk
-                $chunkParams = array_slice($params, $chunkIndex * $chunkSize * 7, count($chunk) * 7);
+                $chunkParams = array_slice(
+                    $params,
+                    $chunkIndex * $chunkSize * 11,
+                    count($chunk) * 11
+                );
 
                 $stmt = $this->db->prepare($query);
                 $stmt->execute($chunkParams);
@@ -206,21 +220,48 @@ class EafModel
             "blocked" => $blockedIds
         ];
     }
-    public function getStudentAllMarks($studentId): array
+    public function getStudentAllMarks($studentId = null, $rollNo = null): array
     {
-        $stmt = $this->db->prepare("
+        $query = "
         SELECT 
+            e.student_id,
+            e.roll_no,
+            e.class_id,
             e.subject_id,
             e.subject_name,
+
             e.fa1m, e.fa2m, e.fa3m, e.fa4m,
             e.sa1m, e.sa2m,
-            e.fa1max, e.sa1max
-        FROM eaf e
-        WHERE e.student_id = ?
-        ORDER BY e.subject_name ASC
-    ");
 
-        $stmt->execute([$studentId]);
+            e.fa1max, e.fa2max, e.fa3max, e.fa4max,
+e.sa1max, e.sa2max,
+
+            CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+            c.name AS class_name
+
+        FROM eaf e
+        INNER JOIN students s ON s.id = e.student_id
+        INNER JOIN classes c ON c.id = e.class_id
+        WHERE 1=1
+    ";
+
+        $params = [];
+
+        if ($studentId) {
+            $query .= " AND e.student_id = ?";
+            $params[] = $studentId;
+        }
+
+        if ($rollNo) {
+            $query .= " AND e.roll_no = ?";
+            $params[] = $rollNo;
+        }
+
+        $query .= " ORDER BY e.subject_name ASC";
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
