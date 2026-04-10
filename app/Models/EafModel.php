@@ -190,6 +190,10 @@ ON DUPLICATE KEY UPDATE
 
             $id = $rec['id'];
             $marks = $rec['marks'];
+            // convert AB → -1
+            if ($marks === null || $marks === 'AB') {
+                $marks = -1;
+            }
 
             // 🔴 STEP 1: Check edit_count
             $check = $this->db->prepare("SELECT edit_count FROM eaf WHERE id = ?");
