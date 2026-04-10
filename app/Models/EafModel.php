@@ -156,7 +156,7 @@ class EafModel
     public function updateMarks($examType, $records)
     {
         if (empty($records)) {
-            return;
+            return ["status" => false, "message" => "No records"];
         }
 
         $column = match ($examType) {
@@ -168,33 +168,59 @@ class EafModel
             'sa2' => 'sa2m',
         };
 
-        // Use CASE statement for bulk update
-        $ids = [];
-        $cases = [];
-        $params = [];
+        $successIds = [];
+        $blockedIds = [];
 
         foreach ($records as $rec) {
-            if (isset($rec['id']) && isset($rec['marks']) && $rec['marks'] !== '') {
-                $ids[] = $rec['id'];
-                $cases[] = "WHEN id = ? THEN ?";
-                $params[] = $rec['id'];
-                $params[] = $rec['marks'];
-            }
+            if (!isset($rec['id']) || $rec['marks'] === '') continue;
+
+            $id = $rec['id'];
+            $marks = $rec['marks'];
+
+            // 🔴 STEP 1: Check edit_count
+            $check = $this->db->prepare("SELECT edit_count FROM eaf WHERE id = ?");
+            $check->execute([$id]);
+            $row = $check->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) continue;
+
+            if ($row['edit_count'] >= 2) {
+                $blockedIds[] = $id;
+                continue;
         }
 
-        if (!empty($ids)) {
-            $idsList = implode(',', array_fill(0, count($ids), '?'));
-            $casesStr = implode(' ', $cases);
+            // 🟢 STEP 2: Update marks + increment count
+            $stmt = $this->db->prepare("
+            UPDATE eaf 
+            SET $column = ?, edit_count = edit_count + 1 
+            WHERE id = ?
+        ");
 
-            $query = "
-                UPDATE eaf 
-                SET $column = CASE $casesStr END
-                WHERE id IN ($idsList)
-            ";
-
-            $params = array_merge($params, $ids);
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
+            $stmt->execute([$marks, $id]);
+            $successIds[] = $id;
         }
+
+        return [
+            "status" => true,
+            "updated" => $successIds,
+            "blocked" => $blockedIds
+        ];
+    }
+    public function getStudentAllMarks($studentId): array
+    {
+        $stmt = $this->db->prepare("
+        SELECT 
+            e.subject_id,
+            e.subject_name,
+            e.fa1m, e.fa2m, e.fa3m, e.fa4m,
+            e.sa1m, e.sa2m,
+            e.fa1max, e.sa1max
+        FROM eaf e
+        WHERE e.student_id = ?
+        ORDER BY e.subject_name ASC
+    ");
+
+        $stmt->execute([$studentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

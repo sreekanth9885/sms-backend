@@ -83,11 +83,34 @@ class EafController
         $examType = $data['exam_type'];
         $records = $data['records'];
 
-        $this->eafModel->updateMarks($examType, $records);
+        $result = $this->eafModel->updateMarks($examType, $records);
 
         Response::json([
             "status" => true,
-            "message" => "Marks saved successfully"
+            "message" => "Marks processed",
+            "updated" => $result['updated'],
+            "blocked" => $result['blocked']
+        ]);
+    }
+    public function getStudentAllMarks()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
+        }
+
+        $studentId = $_GET['student_id'] ?? null;
+
+        if (!$studentId) {
+            Response::json(["message" => "Student ID required"], 422);
+        }
+
+        $data = $this->eafModel->getStudentAllMarks($studentId);
+
+        Response::json([
+            "status" => true,
+            "data" => $data
         ]);
     }
 }

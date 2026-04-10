@@ -132,4 +132,5 @@ $router->get('/subjects', [$subjectController, 'index']);
 $router->post('/eaf/generate', [$eafController, 'generate']);
 $router->get('/eaf/marks', [$eafController, 'getMarks']);
 $router->post('/eaf/save-marks', [$eafController, 'saveMarks']);
+$router->get('/eaf/student-marks', [$eafController, 'getStudentAllMarks']);
 $router->dispatch();
