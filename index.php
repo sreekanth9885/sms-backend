@@ -88,6 +88,7 @@ $router->post('/teachers', [$teacherController, 'create']);
 $router->get('/teachers/{id}', [$teacherController, 'show']);
 $router->post('/teachers/{id}', [$teacherController, 'update']);
 $router->delete('/teachers/{id}', [$teacherController, 'delete']);
+$router->get('teacher/me', [$teacherController, 'me']);
 
 /* Fee Types */
 $router->post('/fee-types', [$feeTypeController, 'create']);
@@ -129,6 +130,7 @@ $router->post('/notifications/send', [$notificationController, 'sendNotification
 $router->get('/notifications/history', [$notificationController, 'getNotificationHistory']);
 $router->post('/auth/select-student', [$studentAuthController, 'selectStudent']);
 $router->get('/subjects', [$subjectController, 'index']);
+$router->get('/subjects/all', [$subjectController, 'all']);
 $router->post('/eaf/generate', [$eafController, 'generate']);
 $router->get('/eaf/marks', [$eafController, 'getMarks']);
 $router->post('/eaf/save-marks', [$eafController, 'saveMarks']);

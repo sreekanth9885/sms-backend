@@ -9,19 +9,20 @@ class TeacherModel
         $this->db = $db;
     }
 
-    public function create(int $schoolId, array $data, ?string $photoUrl = null): int
+    public function create(int $schoolId, array $data, ?string $photoUrl = null, ?int $userId = null): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO teachers (
-                school_id, name, gender, dob, id_number,
-                blood_group, religion, email, phone, address,
-                subject, qualification, experience, photo
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        INSERT INTO teachers (
+            school_id, user_id, name, gender, dob, id_number,
+            blood_group, religion, email, phone, address,
+            subject, qualification, experience, photo
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
 
         $stmt->execute([
             $schoolId,
+            $userId,
             $data['name'],
             $data['gender'],
             $data['dob'],
@@ -123,5 +124,16 @@ class TeacherModel
         $stmt = $this->db->prepare("DELETE FROM teachers WHERE id = ? AND school_id = ?");
         $stmt->execute([$id, $schoolId]);
         return $stmt->rowCount() > 0;
+    }
+    public function findByUserId(int $userId, int $schoolId): ?array
+    {
+        $stmt = $this->db->prepare("
+        SELECT * FROM teachers 
+        WHERE user_id = ? AND school_id = ?
+    ");
+        $stmt->execute([$userId, $schoolId]);
+
+        $teacher = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $teacher ?: null;
     }
 }

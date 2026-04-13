@@ -61,11 +61,23 @@ class AuthController
         }
 
         $user = $this->user->findByEmail($data['email']);
-
+        $teacherId = null;
         if (!$user || !password_verify($data['password'], $user['password'])) {
             Response::json(["message" => "Invalid credentials"], 401);
         }
+        if ($user['role'] === 'TEACHER') {
+            $stmt = $this->db->prepare("
+        SELECT id FROM teachers 
+        WHERE user_id = ? AND school_id = ?
+        LIMIT 1
+    ");
+            $stmt->execute([$user['id'], $user['school_id']]);
+            $teacher = $stmt->fetch(PDO::FETCH_ASSOC);
 
+            if ($teacher) {
+                $teacherId = (int)$teacher['id'];
+            }
+        }
         // Generate tokens via JwtHelper
         $accessToken = JwtHelper::generateAccessToken([
             "id" => $user['id'],
@@ -106,7 +118,8 @@ class AuthController
                 "email" => $user['email'],
                 "role" => $user['role'],
                 "must_reset_password" => (bool)$user['must_reset_password'],
-                "school" => $schoolData
+                "school" => $schoolData,
+                "teacher_id" => $teacherId
             ]
         ]);
     }

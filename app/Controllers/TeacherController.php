@@ -6,9 +6,10 @@ require_once __DIR__ . '/../Helpers/JwtHelper.php';
 class TeacherController
 {
     private TeacherModel $teacherModel;
-
+    private PDO $db;
     public function __construct(PDO $db)
     {
+        $this->db = $db;
         $this->teacherModel = new TeacherModel($db);
     }
 
@@ -20,20 +21,11 @@ class TeacherController
             Response::json(["message" => "School context missing"], 403);
         }
 
-        // Get data from $_POST (for multipart/form-data)
         $data = $_POST;
 
-        // Debug log
         error_log('=== TEACHER CREATE DEBUG ===');
         error_log('$_POST: ' . print_r($_POST, true));
         error_log('$_FILES: ' . print_r($_FILES, true));
-
-        /* ---------- FILE UPLOAD ---------- */
-        $photoUrl = null;
-
-        if (!empty($_FILES['photo']['name'])) {
-            $photoUrl = $this->uploadPhoto($_FILES['photo']);
-        }
 
         /* ---------- REQUIRED CHECK ---------- */
         $required = ['name', 'gender', 'dob', 'id_number', 'phone', 'subject'];
@@ -44,17 +36,75 @@ class TeacherController
             }
         }
 
-        $teacherId = $this->teacherModel->create(
+        /* ---------- FILE UPLOAD ---------- */
+        $photoUrl = null;
+        if (!empty($_FILES['photo']['name'])) {
+            $photoUrl = $this->uploadPhoto($_FILES['photo']);
+        }
+
+        /* ---------- EMAIL DEFAULT ---------- */
+        if (empty($data['email'])) {
+            $data['email'] = strtolower(str_replace(' ', '', $data['name'])) . "@school.com";
+        }
+
+        /* ---------- START TRANSACTION ---------- */
+        $this->db->beginTransaction();
+
+        try {
+
+            /* ---------- CHECK DUPLICATE EMAIL ---------- */
+            $check = $this->db->prepare("SELECT id FROM users WHERE email = ?");
+            $check->execute([$data['email']]);
+
+            if ($check->fetch()) {
+                $this->db->rollBack();
+                Response::json(["message" => "Email already exists"], 409);
+            }
+
+            /* ---------- CREATE USER ---------- */
+            $plainPassword = "teacher123";
+            $hashedPassword = password_hash($plainPassword, PASSWORD_BCRYPT);
+
+            $userStmt = $this->db->prepare("
+            INSERT INTO users (name, email, password, role, school_id, must_reset_password)
+            VALUES (?, ?, ?, 'TEACHER', ?, 1)
+        ");
+
+            $userStmt->execute([
+                $data['name'],
+                $data['email'],
+                $hashedPassword,
+                $user['school_id']
+            ]);
+
+            $userId = (int)$this->db->lastInsertId();
+
+            /* ---------- CREATE TEACHER ---------- */
+            $teacherId = $this->teacherModel->create(
             (int)$user['school_id'],
             $data,
-            $photoUrl
-        );
+                $photoUrl,
+                $userId // ✅ IMPORTANT
+            );
 
-        Response::json([
+            $this->db->commit();
+
+            Response::json([
             "message" => "Teacher created successfully",
             "teacher_id" => $teacherId,
-            "photo_url" => $photoUrl
+                "login_email" => $data['email'],
+                "default_password" => $plainPassword
         ], 201);
+        } catch (Exception $e) {
+
+            $this->db->rollBack();
+
+            error_log("Teacher Create Error: " . $e->getMessage());
+
+            Response::json([
+                "message" => "Failed to create teacher"
+            ], 500);
+        }
     }
 
     public function index()
@@ -274,5 +324,24 @@ class TeacherController
             unlink($filePath);
             error_log('Deleted old photo: ' . $photoUrl);
         }
+    }
+    public function me()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
+        }
+
+        $teacher = $this->teacherModel->findByUserId(
+            (int)$user['id'],
+            (int)$user['school_id']
+        );
+
+        if (!$teacher) {
+            Response::json(["message" => "Teacher not found"], 404);
+        }
+
+        Response::json($teacher);
     }
 }

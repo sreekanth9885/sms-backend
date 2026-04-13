@@ -315,7 +315,8 @@ ON DUPLICATE KEY UPDATE
     public function getStudentAllMarks($studentId = null, $rollNo = null): array
     {
         $query = "
-        SELECT 
+        SELECT
+            e.*, 
             e.student_id,
             e.roll_no,
             e.class_id,

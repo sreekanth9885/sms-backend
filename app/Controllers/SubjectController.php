@@ -29,4 +29,13 @@ class SubjectController
         "subjects" => $subjects
     ]);
 }
+    public function all()
+    {
+        $subjects = $this->subjectModel->getAll();
+
+        Response::json([
+            "status" => true,
+            "subjects" => $subjects
+        ]);
+    }
 }
