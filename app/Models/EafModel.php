@@ -182,46 +182,134 @@ ON DUPLICATE KEY UPDATE
             'sa2' => 'sa2m',
         };
 
+        $gradeColumns = match ($examType) {
+            'fa1' => ['fa1gp', 'fa1gl', 'fa1cp', 'fa1res'],
+            'fa2' => ['fa2gp', 'fa2gl', 'fa2cp', 'fa2res'],
+            'fa3' => ['fa3gp', 'fa3gl', 'fa3cp', 'fa3res'],
+            'fa4' => ['fa4gp', 'fa4gl', 'fa4cp', 'fa4res'],
+            'sa1' => ['sa1gp', 'sa1gl', 'sa1cp', 'sa1res'],
+            'sa2' => ['sa2gp', 'sa2gl', 'sa2cp', 'sa2res'],
+        };
+
+        $batchSize = 200;
+        $totalRecords = count($records);
         $successIds = [];
-        $blockedIds = [];
 
-        foreach ($records as $rec) {
-            if (!isset($rec['id']) || $rec['marks'] === '') continue;
+        for ($i = 0; $i < $totalRecords; $i += $batchSize) {
 
-            $id = $rec['id'];
-            $marks = $rec['marks'];
-            // convert AB → -1
-            if ($marks === null || $marks === 'AB') {
-                $marks = -1;
-            }
+            $batch = array_slice($records, $i, $batchSize);
+            $this->db->beginTransaction();
 
-            // 🔴 STEP 1: Check edit_count
-            $check = $this->db->prepare("SELECT edit_count FROM eaf WHERE id = ?");
-            $check->execute([$id]);
-            $row = $check->fetch(PDO::FETCH_ASSOC);
+            try {
 
-            if (!$row) continue;
+                $updateParts = [];
+                $whereParts = [];
 
-            if ($row['edit_count'] >= 2) {
-                $blockedIds[] = $id;
+                // Marks
+                $hasMarks = false;
+                $marksCase = "$column = CASE ";
+
+                // Grades
+                $gradeCases = [];
+                $hasGradeUpdate = [];
+
+                foreach ($gradeColumns as $gcol) {
+                    $gradeCases[$gcol] = "$gcol = CASE ";
+                    $hasGradeUpdate[$gcol] = false;
+                }
+
+                foreach ($batch as $rec) {
+
+                    $id = null;
+                    $sid = null;
+                    $subid = null;
+
+                    // ✅ Support both formats
+                    if (isset($rec['student_id'], $rec['subject_id'])) {
+                        $sid = (int)$rec['student_id'];
+                        $subid = (int)$rec['subject_id'];
+                        $whereParts[] = "(student_id = $sid AND subject_id = $subid)";
+                    } elseif (isset($rec['id'])) {
+                        $id = (int)$rec['id'];
+                        $whereParts[] = "id = $id";
+                    } else {
+                        continue;
+                    }
+
+                    // ✅ MARKS
+                    if (isset($rec['marks']) && $rec['marks'] !== '') {
+                        $hasMarks = true;
+
+                        $marks = $rec['marks'];
+                        if ($marks === null || $marks === 'AB') {
+                            $marks = -1;
+                        }
+
+                        if ($id) {
+                            $marksCase .= "WHEN id = $id THEN $marks ";
+                        } else {
+                            $marksCase .= "WHEN student_id = $sid AND subject_id = $subid THEN $marks ";
+                        }
+                    }
+
+                    // ✅ GRADES
+                    foreach ($gradeColumns as $gcol) {
+                        if (isset($rec[$gcol])) {
+                            $hasGradeUpdate[$gcol] = true;
+                            $val = $this->db->quote($rec[$gcol]);
+
+                            if ($id) {
+                                $gradeCases[$gcol] .= "WHEN id = $id THEN $val ";
+                            } else {
+                                $gradeCases[$gcol] .= "WHEN student_id = $sid AND subject_id = $subid THEN $val ";
+                            }
+                        }
+                    }
+
+                    // ✅ Success tracking
+                    if ($id) {
+                        $successIds[] = $id;
+                    } else {
+                        $successIds[] = $sid . '_' . $subid;
+                    }
+                }
+
+                // Add marks case
+                if ($hasMarks) {
+                    $marksCase .= "END";
+                    $updateParts[] = $marksCase;
+                }
+
+                // Add grade cases
+                foreach ($gradeCases as $gcol => $caseSql) {
+                    if ($hasGradeUpdate[$gcol]) {
+                        $updateParts[] = $caseSql . "END";
+                    }
+                }
+
+                if (empty($updateParts)) {
+                    $this->db->rollBack();
                 continue;
-        }
+                }
 
-            // 🟢 STEP 2: Update marks + increment count
-            $stmt = $this->db->prepare("
-            UPDATE eaf 
-            SET $column = ?, edit_count = edit_count + 1 
-            WHERE id = ?
-        ");
+                // edit count
+                $updateParts[] = "edit_count = edit_count + 1";
 
-            $stmt->execute([$marks, $id]);
-            $successIds[] = $id;
+                $sql = "UPDATE eaf SET " . implode(", ", $updateParts) .
+                    " WHERE " . implode(" OR ", $whereParts);
+
+                $this->db->exec($sql);
+                $this->db->commit();
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                return ["status" => false, "message" => $e->getMessage()];
+            }
         }
 
         return [
             "status" => true,
             "updated" => $successIds,
-            "blocked" => $blockedIds
+            "blocked" => []
         ];
     }
     public function getStudentAllMarks($studentId = null, $rollNo = null): array

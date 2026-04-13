@@ -80,16 +80,25 @@ class EafController
     {
         $data = json_decode(file_get_contents("php://input"), true);
 
-        $examType = $data['exam_type'];
-        $records = $data['records'];
+        $examType = $data['exam_type'] ?? null;
+
+        // ✅ Support both keys
+        $records = $data['grade_data'] ?? $data['records'] ?? [];
+
+        if (!$examType || empty($records)) {
+            Response::json([
+                "status" => false,
+                "message" => "Missing data"
+            ], 422);
+        }
 
         $result = $this->eafModel->updateMarks($examType, $records);
 
         Response::json([
-            "status" => true,
-            "message" => "Marks processed",
-            "updated" => $result['updated'],
-            "blocked" => $result['blocked']
+            "status" => $result['status'],
+            "message" => $result['status'] ? "Marks processed" : $result['message'],
+            "updated" => $result['updated'] ?? [],
+            "blocked" => $result['blocked'] ?? []
         ]);
     }
     public function getStudentAllMarks()
