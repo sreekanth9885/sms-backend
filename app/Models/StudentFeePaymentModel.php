@@ -12,9 +12,15 @@ class StudentFeePaymentModel
     public function createPayment(array $data)
     {
         $sql = "INSERT INTO student_fee_payments 
-                (student_fee_id, student_id, paid_amount, payment_method, transaction_id, remarks, collected_by, collected_by_name)
-                VALUES 
-                (:student_fee_id, :student_id, :paid_amount, :payment_method, :transaction_id, :remarks, :collected_by, :collected_by_name)";
+    (
+        student_fee_id, student_id, paid_amount, payment_method,
+        transaction_id, remarks, collected_by, collected_by_name, collected_at
+    )
+    VALUES 
+    (
+        :student_fee_id, :student_id, :paid_amount, :payment_method,
+        :transaction_id, :remarks, :collected_by, :collected_by_name, :collected_at
+    )";
 
         $stmt = $this->db->prepare($sql);
 
@@ -26,7 +32,8 @@ class StudentFeePaymentModel
             ':transaction_id' => $data['transaction_id'] ?? null,
             ':remarks' => $data['remarks'] ?? null,
             ':collected_by' => $data['collected_by'],
-            ':collected_by_name' => $data['collected_by_name']
+            ':collected_by_name' => $data['collected_by_name'],
+            ':collected_at' => $data['collected_at'] ?? date('Y-m-d H:i:s'), // ✅ fallback
         ]);
 
         return $this->db->lastInsertId();

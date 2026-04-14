@@ -305,7 +305,7 @@ class StudentFeeController
     }
     public function collectPayment($id)
     {
-        $user = JwtHelper::getUserFromToken(); // 🔥 Get logged-in user
+        $user = JwtHelper::getUserFromToken();
 
         $input = json_decode(file_get_contents("php://input"), true);
 
@@ -313,6 +313,14 @@ class StudentFeeController
         $paymentMethod = $input['payment_method'] ?? null;
         $transactionId = $input['transaction_id'] ?? null;
         $remarks = $input['remarks'] ?? null;
+
+        // ✅ NEW: Handle collected_at
+        $collectedAt = null;
+        if (!empty($input['collected_at'])) {
+            $dt = new DateTime($input['collected_at']); // ISO from frontend
+            $dt->setTimezone(new DateTimeZone('Asia/Kolkata'));
+            $collectedAt = $dt->format('Y-m-d H:i:s');
+        }
 
         if ($amount <= 0) {
             Response::json(['error' => 'Invalid payment amount'], 422);
@@ -336,7 +344,7 @@ class StudentFeeController
         try {
             $this->db->beginTransaction();
 
-            // 1️⃣ Insert into payment ledger
+            // ✅ Insert payment
             $this->paymentModel->createPayment([
                 'student_fee_id'   => $fee['id'],
                 'student_id'       => $fee['student_id'],
@@ -344,11 +352,12 @@ class StudentFeeController
                 'payment_method'   => $paymentMethod,
                 'transaction_id'   => $transactionId,
                 'remarks'          => $remarks,
-                'collected_by'     => (int) $user['id'],        // ✅ dynamic
-                'collected_by_name' => $user['name'] ?? null     // ✅ dynamic
+                'collected_by'     => (int) $user['id'],
+                'collected_by_name' => $user['name'] ?? null,
+                'collected_at'     => $collectedAt // ✅ NEW
             ]);
 
-            // 2️⃣ Update master invoice
+            // Update master fee
             $newPaidAmount = $fee['paid_amount'] + $amount;
 
             $status = 'pending';
