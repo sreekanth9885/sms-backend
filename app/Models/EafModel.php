@@ -300,6 +300,8 @@ ON DUPLICATE KEY UPDATE
 
                 $this->db->exec($sql);
                 $this->db->commit();
+                // ✅ ADD THIS LINE
+                $this->updateFinalSummary($examType, $batch);
             } catch (Exception $e) {
                 $this->db->rollBack();
                 return ["status" => false, "message" => $e->getMessage()];
@@ -356,5 +358,110 @@ e.sa1max, e.sa2max,
         $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    public function updateFinalSummary($examType, $records)
+    {
+        if (empty($records)) return;
+
+        // Get unique students from records
+        $students = [];
+
+        foreach ($records as $rec) {
+            if (isset($rec['student_id'])) {
+                $students[$rec['student_id']] = true;
+            }
+        }
+
+        $studentIds = array_keys($students);
+        if (empty($studentIds)) return;
+
+        // Column mapping
+        $marksColumn = match ($examType) {
+            'fa1' => 'fa1m',
+            'fa2' => 'fa2m',
+            'fa3' => 'fa3m',
+            'fa4' => 'fa4m',
+            'sa1' => 'sa1m',
+            'sa2' => 'sa2m',
+        };
+
+        $maxColumn = match ($examType) {
+            'fa1' => 'fa1max',
+            'fa2' => 'fa2max',
+            'fa3' => 'fa3max',
+            'fa4' => 'fa4max',
+            'sa1' => 'sa1max',
+            'sa2' => 'sa2max',
+        };
+
+        $in = implode(',', array_map('intval', $studentIds));
+
+        // Aggregate per student
+        $sql = "
+        SELECT 
+            e.student_id,
+            e.roll_no,
+            e.class_id,
+            MAX(e.roll_no) as roll_no,
+            SUM(COALESCE(e.$marksColumn, 0)) as total_secured,
+            SUM(COALESCE(e.$maxColumn, 0)) as total_max
+        FROM eaf e
+        WHERE e.student_id IN ($in)
+        GROUP BY e.student_id, e.class_id
+    ";
+
+        $data = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($data as $row) {
+
+            $percentage = $row['total_max'] > 0
+                ? ($row['total_secured'] / $row['total_max']) * 100
+                : 0;
+
+            // Simple grade logic (customize if needed)
+            $grade = match (true) {
+                $percentage >= 90 => 'A+',
+                $percentage >= 75 => 'A',
+                $percentage >= 60 => 'B',
+                $percentage >= 50 => 'C',
+                $percentage >= 35 => 'D',
+                default => 'F',
+            };
+
+            $result = $percentage >= 35 ? 'PASS' : 'FAIL';
+
+            // Get admission number
+            $stmt = $this->db->prepare("SELECT admission_number FROM students WHERE id = ?");
+            $stmt->execute([$row['student_id']]);
+            $admissionNo = $stmt->fetchColumn();
+
+            $insert = "
+            INSERT INTO eaf_final (
+                student_id, admission_no, roll_no, class_id, exam_type,
+                total_max, total_secured, percentage, grade, result
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                total_max = VALUES(total_max),
+                total_secured = VALUES(total_secured),
+                percentage = VALUES(percentage),
+                grade = VALUES(grade),
+                result = VALUES(result),
+                updated_at = CURRENT_TIMESTAMP
+        ";
+
+            $stmt = $this->db->prepare($insert);
+            $stmt->execute([
+                $row['student_id'],
+                $admissionNo,
+                $row['roll_no'],
+                $row['class_id'],
+                $examType,
+                $row['total_max'],
+                $row['total_secured'],
+                $percentage,
+                $grade,
+                $result
+            ]);
+        }
     }
 }
