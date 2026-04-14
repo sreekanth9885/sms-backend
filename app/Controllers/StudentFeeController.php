@@ -316,10 +316,12 @@ class StudentFeeController
 
         // ✅ NEW: Handle collected_at
         $collectedAt = null;
+
         if (!empty($input['collected_at'])) {
-            $dt = new DateTime($input['collected_at']); // ISO from frontend
-            $dt->setTimezone(new DateTimeZone('Asia/Kolkata'));
-            $collectedAt = $dt->format('Y-m-d H:i:s');
+            // Expecting YYYY-MM-DD from frontend
+            $collectedAt = date('Y-m-d', strtotime($input['collected_at']));
+        } else {
+            $collectedAt = date('Y-m-d'); // fallback to today
         }
 
         if ($amount <= 0) {
