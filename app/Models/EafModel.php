@@ -173,7 +173,11 @@ ON DUPLICATE KEY UPDATE
             return ["status" => false, "message" => "No records"];
         }
 
-        $column = match ($examType) {
+        error_log("Exam Type: " . $examType);
+        error_log("Records count: " . count($records));
+        error_log("First record: " . json_encode($records[0] ?? []));
+
+        $marksColumn = match ($examType) {
             'fa1' => 'fa1m',
             'fa2' => 'fa2m',
             'fa3' => 'fa3m',
@@ -182,137 +186,303 @@ ON DUPLICATE KEY UPDATE
             'sa2' => 'sa2m',
         };
 
-        $gradeColumns = match ($examType) {
-            'fa1' => ['fa1gp', 'fa1gl', 'fa1cp', 'fa1res'],
-            'fa2' => ['fa2gp', 'fa2gl', 'fa2cp', 'fa2res'],
-            'fa3' => ['fa3gp', 'fa3gl', 'fa3cp', 'fa3res'],
-            'fa4' => ['fa4gp', 'fa4gl', 'fa4cp', 'fa4res'],
-            'sa1' => ['sa1gp', 'sa1gl', 'sa1cp', 'sa1res'],
-            'sa2' => ['sa2gp', 'sa2gl', 'sa2cp', 'sa2res'],
+        $maxColumn = match ($examType) {
+            'fa1' => 'fa1max',
+            'fa2' => 'fa2max',
+            'fa3' => 'fa3max',
+            'fa4' => 'fa4max',
+            'sa1' => 'sa1max',
+            'sa2' => 'sa2max',
         };
 
-        $batchSize = 200;
-        $totalRecords = count($records);
-        $successIds = [];
+        $gradePointColumn = match ($examType) {
+            'fa1' => 'fa1gp',
+            'fa2' => 'fa2gp',
+            'fa3' => 'fa3gp',
+            'fa4' => 'fa4gp',
+            'sa1' => 'sa1gp',
+            'sa2' => 'sa2gp',
+        };
 
-        for ($i = 0; $i < $totalRecords; $i += $batchSize) {
+        // Add cumulative points column (same as grade points)
+        $cumulativePointColumn = match ($examType) {
+            'fa1' => 'fa1cp',
+            'fa2' => 'fa2cp',
+            'fa3' => 'fa3cp',
+            'fa4' => 'fa4cp',
+            'sa1' => 'sa1cp',
+            'sa2' => 'sa2cp',
+        };
 
-            $batch = array_slice($records, $i, $batchSize);
-            $this->db->beginTransaction();
+        $gradeLetterColumn = match ($examType) {
+            'fa1' => 'fa1gl',
+            'fa2' => 'fa2gl',
+            'fa3' => 'fa3gl',
+            'fa4' => 'fa4gl',
+            'sa1' => 'sa1gl',
+            'sa2' => 'sa2gl',
+        };
 
-            try {
+        $resultColumn = match ($examType) {
+            'fa1' => 'fa1res',
+            'fa2' => 'fa2res',
+            'fa3' => 'fa3res',
+            'fa4' => 'fa4res',
+            'sa1' => 'sa1res',
+            'sa2' => 'sa2res',
+        };
 
-                $updateParts = [];
-                $whereParts = [];
+        $successCount = 0;
+        $updatedStudentIds = [];
 
-                // Marks
-                $hasMarks = false;
-                $marksCase = "$column = CASE ";
+        $this->db->beginTransaction();
 
-                // Grades
-                $gradeCases = [];
-                $hasGradeUpdate = [];
+        try {
+            // Flatten all subjects first
+            $allSubjects = [];
 
-                foreach ($gradeColumns as $gcol) {
-                    $gradeCases[$gcol] = "$gcol = CASE ";
-                    $hasGradeUpdate[$gcol] = false;
-                }
+            foreach ($records as $record) {
+                // Format 1: Direct ID format {id, marks}
+                if (isset($record['id']) && !isset($record['student_id'])) {
+                    $stmt = $this->db->prepare("
+                    SELECT student_id, subject_id, $maxColumn 
+                    FROM eaf 
+                    WHERE id = ?
+                ");
+                    $stmt->execute([$record['id']]);
+                    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                foreach ($batch as $rec) {
-
-                    $id = null;
-                    $sid = null;
-                    $subid = null;
-
-                    // ✅ Support both formats
-                    if (isset($rec['student_id'], $rec['subject_id'])) {
-                        $sid = (int)$rec['student_id'];
-                        $subid = (int)$rec['subject_id'];
-                        $whereParts[] = "(student_id = $sid AND subject_id = $subid)";
-                    } elseif (isset($rec['id'])) {
-                        $id = (int)$rec['id'];
-                        $whereParts[] = "id = $id";
-                    } else {
-                        continue;
-                    }
-
-                    // ✅ MARKS
-                    if (isset($rec['marks']) && $rec['marks'] !== '') {
-                        $hasMarks = true;
-
-                        $marks = $rec['marks'];
-                        if ($marks === null || $marks === 'AB') {
-                            $marks = -1;
-                        }
-
-                        if ($id) {
-                            $marksCase .= "WHEN id = $id THEN $marks ";
-                        } else {
-                            $marksCase .= "WHEN student_id = $sid AND subject_id = $subid THEN $marks ";
-                        }
-                    }
-
-                    // ✅ GRADES
-                    foreach ($gradeColumns as $gcol) {
-                        if (isset($rec[$gcol])) {
-                            $hasGradeUpdate[$gcol] = true;
-                            $val = $this->db->quote($rec[$gcol]);
-
-                            if ($id) {
-                                $gradeCases[$gcol] .= "WHEN id = $id THEN $val ";
-                            } else {
-                                $gradeCases[$gcol] .= "WHEN student_id = $sid AND subject_id = $subid THEN $val ";
-                            }
-                        }
-                    }
-
-                    // ✅ Success tracking
-                    if ($id) {
-                        $successIds[] = $id;
-                    } else {
-                        $successIds[] = $sid . '_' . $subid;
+                    if ($existing) {
+                        $allSubjects[] = [
+                            'student_id' => $existing['student_id'],
+                            'subject_id' => $existing['subject_id'],
+                            'marks' => $record['marks'] ?? null,
+                            'max_marks' => $existing[$maxColumn],
+                            'grade_points' => $record['grade_points'] ?? null,
+                            'grade' => $record['grade'] ?? null,
+                            'result' => $record['result'] ?? null
+                        ];
+                        $updatedStudentIds[$existing['student_id']] = true;
                     }
                 }
-
-                // Add marks case
-                if ($hasMarks) {
-                    $marksCase .= "END";
-                    $updateParts[] = $marksCase;
-                }
-
-                // Add grade cases
-                foreach ($gradeCases as $gcol => $caseSql) {
-                    if ($hasGradeUpdate[$gcol]) {
-                        $updateParts[] = $caseSql . "END";
+                // Format 2: Nested structure
+                elseif (isset($record['subjects']) && is_array($record['subjects'])) {
+                    foreach ($record['subjects'] as $subject) {
+                        $allSubjects[] = [
+                            'student_id' => $record['student_id'],
+                            'subject_id' => $subject['subject_id'],
+                            'marks' => $subject['marks'] ?? null,
+                            'max_marks' => $subject['max_marks'] ?? null,
+                            'grade_points' => $subject['grade_points'] ?? null,
+                            'grade' => $subject['grade'] ?? null,
+                            'result' => $subject['result'] ?? null
+                        ];
+                        $updatedStudentIds[$record['student_id']] = true;
                     }
                 }
-
-                if (empty($updateParts)) {
-                    $this->db->rollBack();
-                continue;
+                // Format 3: Flattened structure
+                elseif (isset($record['student_id']) && isset($record['subject_id'])) {
+                    $allSubjects[] = [
+                        'student_id' => $record['student_id'],
+                        'subject_id' => $record['subject_id'],
+                        'marks' => $record['marks'] ?? null,
+                        'max_marks' => $record['max_marks'] ?? null,
+                        'grade_points' => $record['grade_points'] ?? null,
+                        'grade' => $record['grade'] ?? null,
+                        'result' => $record['result'] ?? null
+                    ];
+                    $updatedStudentIds[$record['student_id']] = true;
                 }
+            }
 
-                // edit count
-                $updateParts[] = "edit_count = edit_count + 1";
-
-                $sql = "UPDATE eaf SET " . implode(", ", $updateParts) .
-                    " WHERE " . implode(" OR ", $whereParts);
-
-                $this->db->exec($sql);
+            if (empty($allSubjects)) {
                 $this->db->commit();
-                // ✅ ADD THIS LINE
-                $this->updateFinalSummary($examType, $batch);
-            } catch (Exception $e) {
-                $this->db->rollBack();
-                return ["status" => false, "message" => $e->getMessage()];
+                return ["status" => true, "message" => "No valid records to update", "updated" => 0];
+            }
+
+            // Prepare CASE WHEN statements for bulk update
+            $caseMarks = "CASE ";
+            $caseResult = "CASE ";
+            $caseGradePoint = "CASE ";
+            $caseCumulativePoint = "CASE ";  // Add for cumulative points
+            $caseGradeLetter = "CASE ";
+
+            $ids = [];
+
+            foreach ($allSubjects as $subject) {
+                $key = $subject['student_id'] . '_' . $subject['subject_id'];
+                $ids[] = $key;
+
+                // Prepare CASE for marks
+                if (isset($subject['marks']) && $subject['marks'] !== null) {
+                    $marksValue = ($subject['marks'] == -1 || $subject['marks'] === "ABSENT") ? -1 : (int)$subject['marks'];
+                    $caseMarks .= "WHEN student_id = {$subject['student_id']} AND subject_id = {$subject['subject_id']} THEN $marksValue ";
+
+                    // Calculate result based on marks
+                    $maxMarks = $subject['max_marks'] ?? 100;
+                    if ($marksValue == -1) {
+                        $subjectResult = 0;
+                    } else {
+                        $percentage = ($marksValue / $maxMarks) * 100;
+                        $subjectResult = ($percentage >= 35) ? 1 : 0;
+                    }
+
+                    $caseResult .= "WHEN student_id = {$subject['student_id']} AND subject_id = {$subject['subject_id']} THEN $subjectResult ";
+                }
+
+                // Prepare CASE for grade points
+                if (isset($subject['grade_points']) && $subject['grade_points'] !== null) {
+                    $gradePointsValue = $subject['grade_points'];
+                    $caseGradePoint .= "WHEN student_id = {$subject['student_id']} AND subject_id = {$subject['subject_id']} THEN $gradePointsValue ";
+                    // CRITICAL: Also set cumulative points to the same value
+                    $caseCumulativePoint .= "WHEN student_id = {$subject['student_id']} AND subject_id = {$subject['subject_id']} THEN $gradePointsValue ";
+                }
+
+                // Prepare CASE for grade letter
+                if (isset($subject['grade']) && $subject['grade'] !== null) {
+                    $gradeValue = $this->db->quote($subject['grade']);
+                    $caseGradeLetter .= "WHEN student_id = {$subject['student_id']} AND subject_id = {$subject['subject_id']} THEN $gradeValue ";
+                }
+            }
+
+            if (empty($ids)) {
+                $this->db->commit();
+                return ["status" => true, "message" => "No records to update", "updated" => 0];
+            }
+
+            // Build the complete UPDATE query
+            $updateFields = [];
+
+            if (strpos($caseMarks, "WHEN") !== false) {
+                $caseMarks .= "ELSE $marksColumn END";
+                $updateFields[] = "$marksColumn = $caseMarks";
+            }
+
+            if (strpos($caseResult, "WHEN") !== false) {
+                $caseResult .= "ELSE $resultColumn END";
+                $updateFields[] = "$resultColumn = $caseResult";
+            }
+
+            if (strpos($caseGradePoint, "WHEN") !== false) {
+                $caseGradePoint .= "ELSE $gradePointColumn END";
+                $updateFields[] = "$gradePointColumn = $caseGradePoint";
+            }
+
+            // Add cumulative points update
+            if (strpos($caseCumulativePoint, "WHEN") !== false) {
+                $caseCumulativePoint .= "ELSE $cumulativePointColumn END";
+                $updateFields[] = "$cumulativePointColumn = $caseCumulativePoint";
+            }
+
+            if (strpos($caseGradeLetter, "WHEN") !== false) {
+                $caseGradeLetter .= "ELSE $gradeLetterColumn END";
+                $updateFields[] = "$gradeLetterColumn = $caseGradeLetter";
+            }
+
+            $updateFields[] = "edit_count = edit_count + 1";
+            $updateFields[] = "updated_at = CURRENT_TIMESTAMP";
+
+            // Create WHERE IN clause
+            $whereConditions = [];
+            foreach ($ids as $id) {
+                list($studentId, $subjectId) = explode('_', $id);
+                $whereConditions[] = "(student_id = $studentId AND subject_id = $subjectId)";
+            }
+            $whereClause = implode(" OR ", $whereConditions);
+
+            $sql = "UPDATE eaf SET " . implode(", ", $updateFields) . " WHERE $whereClause";
+
+            error_log("Bulk update SQL length: " . strlen($sql));
+
+            // Execute single bulk update
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute();
+            $successCount = count($ids);
+
+            $this->db->commit();
+
+            error_log("Successfully updated: $successCount subject records");
+
+            // Update overall results for all affected students
+            if (!empty($updatedStudentIds)) {
+                $this->updateOverallResults($examType, array_keys($updatedStudentIds));
+            }
+
+            return [
+                "status" => true,
+                "message" => "Marks processed",
+                "updated" => $successCount
+            ];
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log("Update marks error: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return [
+                "status" => false,
+                "message" => $e->getMessage()
+            ];
+        }
+    }
+
+    private function updateOverallResults($examType, $studentIds)
+    {
+        if (empty($studentIds)) return;
+
+        $resultColumn = match ($examType) {
+            'fa1' => 'fa1res',
+            'fa2' => 'fa2res',
+            'fa3' => 'fa3res',
+            'fa4' => 'fa4res',
+            'sa1' => 'sa1res',
+            'sa2' => 'sa2res',
+        };
+
+        // Process in chunks
+        $chunks = array_chunk($studentIds, 50);
+
+        foreach ($chunks as $chunk) {
+            $in = implode(',', array_map('intval', $chunk));
+
+            // Get subject results for each student
+            $sql = "
+            SELECT 
+                e.student_id,
+                e.class_id,
+                MIN(CASE 
+                    WHEN e.$resultColumn = 0 THEN 0 
+                    ELSE 1 
+                END) as has_all_pass
+            FROM eaf e
+            WHERE e.student_id IN ($in)
+            GROUP BY e.student_id, e.class_id
+        ";
+
+            $data = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+            // Prepare bulk update for result_status
+            $caseResultStatus = "CASE ";
+            $studentClassMap = [];
+
+            foreach ($data as $row) {
+                $overallResult = ($row['has_all_pass'] == 1) ? 'pass' : 'fail';
+                $resultValue = $this->db->quote($overallResult);
+                $caseResultStatus .= "WHEN student_id = {$row['student_id']} AND class_id = {$row['class_id']} THEN $resultValue ";
+                $studentClassMap[] = $row['student_id'] . '_' . $row['class_id'];
+            }
+
+            if (!empty($studentClassMap)) {
+                $caseResultStatus .= "ELSE result_status END";
+
+                $whereConditions = [];
+                foreach ($data as $row) {
+                    $whereConditions[] = "(student_id = {$row['student_id']} AND class_id = {$row['class_id']})";
+                }
+                $whereClause = implode(" OR ", $whereConditions);
+
+                $updateSql = "UPDATE eaf SET result_status = $caseResultStatus WHERE $whereClause";
+                $this->db->exec($updateSql);
             }
         }
-
-        return [
-            "status" => true,
-            "updated" => $successIds,
-            "blocked" => []
-        ];
     }
     public function getStudentAllMarks($studentId = null, $rollNo = null): array
     {
@@ -363,19 +533,19 @@ e.sa1max, e.sa2max,
     {
         if (empty($records)) return;
 
-        // Get unique students from records
-        $students = [];
-
-        foreach ($records as $rec) {
-            if (isset($rec['student_id'])) {
-                $students[$rec['student_id']] = true;
+        // Extract unique student IDs from flattened records
+        $studentIds = [];
+        foreach ($records as $record) {
+            if (isset($record['student_id'])) {
+                $studentIds[$record['student_id']] = true;
             }
         }
 
-        $studentIds = array_keys($students);
+        $studentIds = array_keys($studentIds);
         if (empty($studentIds)) return;
 
-        // Column mapping
+        error_log("Updating final summary for students: " . json_encode($studentIds));
+
         $marksColumn = match ($examType) {
             'fa1' => 'fa1m',
             'fa2' => 'fa2m',
@@ -400,25 +570,28 @@ e.sa1max, e.sa2max,
         $sql = "
         SELECT 
             e.student_id,
-            e.roll_no,
             e.class_id,
-            MAX(e.roll_no) as roll_no,
-            SUM(COALESCE(e.$marksColumn, 0)) as total_secured,
+            e.roll_no,
+            SUM(CASE 
+                WHEN COALESCE(e.$marksColumn, -1) = -1 THEN 0 
+                ELSE COALESCE(e.$marksColumn, 0) 
+            END) as total_secured,
             SUM(COALESCE(e.$maxColumn, 0)) as total_max
         FROM eaf e
         WHERE e.student_id IN ($in)
-        GROUP BY e.student_id, e.class_id
+        GROUP BY e.student_id, e.class_id, e.roll_no
     ";
 
         $data = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($data as $row) {
+        error_log("Final summary data: " . json_encode($data));
 
+        foreach ($data as $row) {
             $percentage = $row['total_max'] > 0
                 ? ($row['total_secured'] / $row['total_max']) * 100
                 : 0;
 
-            // Simple grade logic (customize if needed)
+            // Grade logic
             $grade = match (true) {
                 $percentage >= 90 => 'A+',
                 $percentage >= 75 => 'A',
@@ -462,6 +635,8 @@ e.sa1max, e.sa2max,
                 $grade,
                 $result
             ]);
+
+            error_log("Updated final summary for student_id: {$row['student_id']}, grade: $grade, result: $result");
         }
     }
 }

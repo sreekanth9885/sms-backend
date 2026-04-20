@@ -28,7 +28,7 @@ require_once __DIR__ . '/app/Controllers/NotificationController.php';
 require_once __DIR__ . '/app/Controllers/SubjectController.php';
 require_once __DIR__ . '/app/Controllers/EafController.php';
 require_once __DIR__ . '/app/Controllers/MasterClassController.php';
-// require_once __DIR__ . '/app/Controllers/ExamController.php';
+require_once __DIR__ . '/app/Controllers/TeacherTimetableController.php';
 
 $router = new Router();
 
@@ -49,6 +49,7 @@ $notificationController = new NotificationController($pdo);
 $subjectController = new SubjectController($pdo);
 $eafController = new EafController($pdo);
 $masterClassController = new MasterClassController($pdo);
+$teacherTimetableController = new TeacherTimetableController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -135,4 +136,6 @@ $router->post('/eaf/generate', [$eafController, 'generate']);
 $router->get('/eaf/marks', [$eafController, 'getMarks']);
 $router->post('/eaf/save-marks', [$eafController, 'saveMarks']);
 $router->get('/eaf/student-marks', [$eafController, 'getStudentAllMarks']);
+$router->post('/teacher-timetables', [$teacherTimetableController, 'create']);
+
 $router->dispatch();
