@@ -74,4 +74,69 @@ class TeacherTimetableModel
 
         $stmt->execute([$schoolId, $classId, $teacherId]);
     }
+    public function getTimetable($schoolId, $classId = null, $teacherId = null, $date = null)
+    {
+        $sql = "
+        SELECT 
+            tt.id,
+            tt.class_id,
+            c.name AS class_name,
+
+            tt.teacher_id,
+            t.name AS teacher_name,
+            t.phone AS teacher_phone,
+            t.email AS teacher_email,
+            t.subject AS teacher_subject,
+
+            tt.subject_id,
+
+            tt.start_date,
+            tt.end_date,
+            tt.start_time,
+            tt.end_time,
+            tt.academic_year
+        FROM teacher_timetables tt
+
+        LEFT JOIN classes c 
+            ON c.id = tt.class_id AND c.school_id = tt.school_id
+
+        LEFT JOIN teachers t 
+            ON t.id = tt.teacher_id AND t.school_id = tt.school_id
+
+        WHERE tt.school_id = ?
+        AND tt.is_active = 1
+    ";
+
+        $params = [$schoolId];
+
+        // 🔍 Filter: class
+        if (!empty($classId)) {
+            $sql .= " AND tt.class_id = ?";
+            $params[] = $classId;
+        }
+
+        // 🔍 Filter: teacher
+        if (!empty($teacherId)) {
+            $sql .= " AND tt.teacher_id = ?";
+            $params[] = $teacherId;
+        }
+
+        // 🔍 Filter: date
+        if (!empty($date)) {
+            $sql .= "
+            AND tt.start_date <= ?
+            AND (tt.end_date IS NULL OR tt.end_date >= ?)
+        ";
+            $params[] = $date;
+            $params[] = $date;
+        }
+
+        // ⏰ Order
+        $sql .= " ORDER BY tt.start_time ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

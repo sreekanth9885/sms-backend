@@ -77,4 +77,30 @@ class TeacherTimetableController
             "id" => $id
         ], 201);
     }
+    public function get()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        if (!isset($user['school_id'])) {
+            Response::json(["message" => "School context missing"], 403);
+        }
+
+        $params = $_GET;
+
+        $classId   = $params['class_id'] ?? null;
+        $teacherId = $params['teacher_id'] ?? null;
+        $date      = $params['date'] ?? null;
+
+        $data = $this->model->getTimetable(
+            $user['school_id'],
+            $classId,
+            $teacherId,
+            $date
+        );
+
+        Response::json([
+            "message" => "Timetable fetched successfully",
+            "data" => $data
+        ]);
+    }
 }
