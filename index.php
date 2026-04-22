@@ -138,4 +138,6 @@ $router->post('/eaf/save-marks', [$eafController, 'saveMarks']);
 $router->get('/eaf/student-marks', [$eafController, 'getStudentAllMarks']);
 $router->post('/teacher-timetables', [$teacherTimetableController, 'create']);
 $router->get('/teacher-timetables', [$teacherTimetableController, 'get']);
+$router->put('/teacher-timetables/{id}', [$teacherTimetableController, 'update']);
+
 $router->dispatch();
