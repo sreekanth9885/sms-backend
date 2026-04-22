@@ -29,6 +29,7 @@ require_once __DIR__ . '/app/Controllers/SubjectController.php';
 require_once __DIR__ . '/app/Controllers/EafController.php';
 require_once __DIR__ . '/app/Controllers/MasterClassController.php';
 require_once __DIR__ . '/app/Controllers/TeacherTimetableController.php';
+require_once __DIR__ . '/app/Controllers/AgencyController.php';
 
 $router = new Router();
 
@@ -50,6 +51,7 @@ $subjectController = new SubjectController($pdo);
 $eafController = new EafController($pdo);
 $masterClassController = new MasterClassController($pdo);
 $teacherTimetableController = new TeacherTimetableController($pdo);
+$agencyController = new AgencyController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -139,5 +141,12 @@ $router->get('/eaf/student-marks', [$eafController, 'getStudentAllMarks']);
 $router->post('/teacher-timetables', [$teacherTimetableController, 'create']);
 $router->get('/teacher-timetables', [$teacherTimetableController, 'get']);
 $router->put('/teacher-timetables/{id}', [$teacherTimetableController, 'update']);
+
+// Agency routes
+$router->post('/agencies', [$agencyController, 'create']);
+$router->get('/agencies', [$agencyController, 'index']);
+$router->put('/agencies/{id}', [$agencyController, 'update']);
+$router->delete('/agencies/{id}', [$agencyController, 'delete']);
+
 
 $router->dispatch();

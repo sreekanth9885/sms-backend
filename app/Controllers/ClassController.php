@@ -51,7 +51,9 @@ class ClassController
             (int)$user['school_id']
         );
 
-        Response::json($classes);
+        Response::json([
+            "data" => $classes
+        ]);
     }
 
     public function delete($id)
