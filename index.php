@@ -30,6 +30,9 @@ require_once __DIR__ . '/app/Controllers/EafController.php';
 require_once __DIR__ . '/app/Controllers/MasterClassController.php';
 require_once __DIR__ . '/app/Controllers/TeacherTimetableController.php';
 require_once __DIR__ . '/app/Controllers/AgencyController.php';
+require_once __DIR__ . '/app/Controllers/CategoryController.php';
+require_once __DIR__ . '/app/Controllers/SubCategoryController.php';
+require_once __DIR__ . '/app/Controllers/ProductController.php';
 
 $router = new Router();
 
@@ -52,6 +55,9 @@ $eafController = new EafController($pdo);
 $masterClassController = new MasterClassController($pdo);
 $teacherTimetableController = new TeacherTimetableController($pdo);
 $agencyController = new AgencyController($pdo);
+$categoryController = new CategoryController($pdo);
+$subCategoryController = new SubCategoryController($pdo);
+$productController = new ProductController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -148,5 +154,22 @@ $router->get('/agencies', [$agencyController, 'index']);
 $router->put('/agencies/{id}', [$agencyController, 'update']);
 $router->delete('/agencies/{id}', [$agencyController, 'delete']);
 
+// Category routes
+$router->post('/categories', [$categoryController, 'create']);
+$router->get('/categories', [$categoryController, 'index']);
+$router->put('/categories/{id}', [$categoryController, 'update']);
+$router->delete('/categories/{id}', [$categoryController, 'delete']);
+
+// SubCategory routes
+$router->post('/sub-categories', [$subCategoryController, 'create']);
+$router->get('/sub-categories', [$subCategoryController, 'index']);
+$router->put('/sub-categories/{id}', [$subCategoryController, 'update']);
+$router->delete('/sub-categories/{id}', [$subCategoryController, 'delete']);
+
+// Product routes
+$router->post('/products', [$productController, 'create']);
+$router->get('/products', [$productController, 'index']);
+$router->put('/products/{id}', [$productController, 'update']);
+$router->delete('/products/{id}', [$productController, 'delete']);
 
 $router->dispatch();
