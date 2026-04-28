@@ -33,6 +33,7 @@ require_once __DIR__ . '/app/Controllers/AgencyController.php';
 require_once __DIR__ . '/app/Controllers/CategoryController.php';
 require_once __DIR__ . '/app/Controllers/SubCategoryController.php';
 require_once __DIR__ . '/app/Controllers/ProductController.php';
+require_once __DIR__ . '/app/Controllers/StockEntryController.php';
 
 $router = new Router();
 
@@ -58,6 +59,7 @@ $agencyController = new AgencyController($pdo);
 $categoryController = new CategoryController($pdo);
 $subCategoryController = new SubCategoryController($pdo);
 $productController = new ProductController($pdo);
+$stockEntryController = new StockEntryController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -172,4 +174,9 @@ $router->get('/products', [$productController, 'index']);
 $router->put('/products/{id}', [$productController, 'update']);
 $router->delete('/products/{id}', [$productController, 'delete']);
 
+// Stock Entry routes
+$router->post('/stock-entries', [$stockEntryController, 'create']);
+$router->get('/stock-entries', [$stockEntryController, 'index']);
+$router->put('/stock-entries/{id}', [$stockEntryController, 'update']);
+$router->delete('/stock-entries/{id}', [$stockEntryController, 'delete']);
 $router->dispatch();
