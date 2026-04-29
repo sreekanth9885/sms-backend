@@ -15,7 +15,7 @@ class StockEntryModel
         // 🔴 Duplicate invoice check
         $stmt = $this->db->prepare("
             SELECT id FROM stock_entries 
-            WHERE school_id=? AND invoice_no=?
+            WHERE school_id=? AND invoice_no=? AND is_active=1
         ");
         $stmt->execute([$schoolId, $data['invoice_no']]);
 
@@ -93,7 +93,7 @@ class StockEntryModel
                a.name as agency_name
         FROM stock_entries se
         JOIN agencies a ON a.id = se.agency_id
-        WHERE se.school_id = ?
+        WHERE se.school_id = ? AND se.is_active = 1
         ORDER BY se.id DESC
     ");
     $stmt->execute([$schoolId]);
@@ -116,7 +116,7 @@ class StockEntryModel
             JOIN products p ON p.id = sei.product_id
             JOIN categories c ON c.id = p.category_id
             JOIN sub_categories sc ON sc.id = p.sub_category_id
-            WHERE sei.stock_entry_id = ?
+            WHERE sei.stock_entry_id = ? AND sei.is_active = 1
         ");
 
         $stmt->execute([$entry['id']]);
@@ -130,35 +130,41 @@ public function delete($id, $schoolId)
 {
     $this->db->beginTransaction();
 
-    // 🔁 Reduce stock before delete
-    $stmt = $this->db->prepare("
-        SELECT product_id, quantity FROM stock_entry_items 
-        WHERE stock_entry_id = ?
+        // 🔁 Step 1: Get active items only
+        $stmt = $this->db->prepare("
+        SELECT product_id, quantity 
+        FROM stock_entry_items 
+        WHERE stock_entry_id = ? AND is_active = 1
     ");
     $stmt->execute([$id]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($items as $item) {
-        $stmt = $this->db->prepare("
+        // 🔁 Step 2: Reverse stock
+        foreach ($items as $item) {
+            $this->db->prepare("
             UPDATE products 
-            SET quantity = quantity - ?
+            SET quantity = quantity - ? 
             WHERE id = ? AND school_id = ?
-        ");
-
-        $stmt->execute([
+        ")->execute([
             $item['quantity'],
             $item['product_id'],
             $schoolId
         ]);
     }
 
-    // Delete items
-    $stmt = $this->db->prepare("DELETE FROM stock_entry_items WHERE stock_entry_id=?");
-    $stmt->execute([$id]);
+        // 🔁 Step 3: Soft delete items
+        $this->db->prepare("
+        UPDATE stock_entry_items 
+        SET is_active = 0 
+        WHERE stock_entry_id = ?
+    ")->execute([$id]);
 
-    // Delete header
-    $stmt = $this->db->prepare("DELETE FROM stock_entries WHERE id=? AND school_id=?");
-    $stmt->execute([$id, $schoolId]);
+        // 🔁 Step 4: Soft delete entry
+        $this->db->prepare("
+        UPDATE stock_entries 
+        SET is_active = 0 
+        WHERE id = ? AND school_id = ?
+    ")->execute([$id, $schoolId]);
 
     $this->db->commit();
 
@@ -171,7 +177,7 @@ public function update($id, $schoolId, $data, $userId)
     // 🔁 Step 1: Reverse old stock
     $stmt = $this->db->prepare("
         SELECT product_id, quantity FROM stock_entry_items 
-        WHERE stock_entry_id = ?
+        WHERE stock_entry_id = ? AND is_active = 1
     ");
     $stmt->execute([$id]);
     $oldItems = $stmt->fetchAll(PDO::FETCH_ASSOC);

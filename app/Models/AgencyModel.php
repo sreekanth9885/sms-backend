@@ -76,7 +76,9 @@ class AgencyModel
     public function delete(int $id, int $schoolId): bool
     {
         $stmt = $this->db->prepare("
-            DELETE FROM agencies WHERE id=? AND school_id=?
+            UPDATE agencies 
+        SET is_active = 0 
+        WHERE id = ? AND school_id = ?
         ");
         $stmt->execute([$id, $schoolId]);
 
@@ -101,7 +103,8 @@ class AgencyModel
     {
         $sql = "
             SELECT id FROM agencies 
-            WHERE school_id = ? 
+            WHERE school_id = ?
+            AND is_active = 1 
             AND (phone = ? OR gst_number = ?)
         ";
 

@@ -74,8 +74,10 @@ class ProductModel
     public function delete(int $id, int $schoolId): bool
     {
         $stmt = $this->db->prepare("
-            DELETE FROM products WHERE id=? AND school_id=?
-        ");
+        UPDATE products 
+        SET is_active = 0 
+        WHERE id = ? AND school_id = ?
+    ");
 
         $stmt->execute([$id, $schoolId]);
 
@@ -85,21 +87,24 @@ class ProductModel
     public function all(int $schoolId): array
     {
         $stmt = $this->db->prepare("
-            SELECT 
-                p.id,
-                p.name,
-                p.quantity,
-                p.unit,
-                p.category_id,
-                p.sub_category_id,
-                c.name AS category_name,
-                sc.name AS sub_category_name
-            FROM products p
-            JOIN categories c ON c.id = p.category_id
-            JOIN sub_categories sc ON sc.id = p.sub_category_id
-            WHERE p.school_id=? AND p.is_active=1
-            ORDER BY p.id DESC
-        ");
+        SELECT 
+            p.id,
+            p.name,
+            p.quantity,
+            p.unit,
+            p.category_id,
+            p.sub_category_id,
+            c.name AS category_name,
+            sc.name AS sub_category_name
+        FROM products p
+        JOIN categories c ON c.id = p.category_id
+        JOIN sub_categories sc ON sc.id = p.sub_category_id
+        WHERE p.school_id=? 
+        AND p.is_active=1
+        AND c.is_active=1
+        AND sc.is_active=1
+        ORDER BY p.id DESC
+    ");
 
         $stmt->execute([$schoolId]);
 
@@ -114,9 +119,12 @@ class ProductModel
     ): bool {
 
         $sql = "
-            SELECT id FROM products
-            WHERE school_id=? AND sub_category_id=? AND name=?
-        ";
+        SELECT id FROM products
+        WHERE school_id=? 
+        AND sub_category_id=? 
+        AND name=? 
+        AND is_active=1
+    ";
 
         if ($excludeId) {
             $sql .= " AND id != ?";

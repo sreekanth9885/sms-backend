@@ -44,8 +44,10 @@ class SubCategoryModel
     public function delete(int $id, int $schoolId): bool
     {
         $stmt = $this->db->prepare("
-            DELETE FROM sub_categories WHERE id=? AND school_id=?
-        ");
+        UPDATE sub_categories 
+        SET is_active = 0 
+        WHERE id = ? AND school_id = ?
+    ");
 
         $stmt->execute([$id, $schoolId]);
 
@@ -58,7 +60,7 @@ class SubCategoryModel
             SELECT sc.id, sc.name, sc.category_id, c.name AS category_name
             FROM sub_categories sc
             JOIN categories c ON c.id = sc.category_id
-            WHERE sc.school_id=? AND sc.is_active=1
+            WHERE sc.school_id=? AND sc.is_active=1 AND c.is_active=1
             ORDER BY sc.id DESC
         ");
 
@@ -71,7 +73,7 @@ class SubCategoryModel
     {
         $sql = "
             SELECT id FROM sub_categories
-            WHERE school_id=? AND category_id=? AND name=?
+            WHERE school_id=? AND category_id=? AND name=? AND is_active=1
         ";
 
         if ($excludeId) {

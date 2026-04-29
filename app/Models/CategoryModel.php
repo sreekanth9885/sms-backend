@@ -42,13 +42,30 @@ class CategoryModel
 
     public function delete(int $id, int $schoolId): bool
     {
-        $stmt = $this->db->prepare("
-            DELETE FROM categories WHERE id=? AND school_id=?
-        ");
+        try {
+            $this->db->beginTransaction();
 
-        $stmt->execute([$id, $schoolId]);
+            // Soft delete category
+            $this->db->prepare("
+            UPDATE categories 
+            SET is_active = 0 
+            WHERE id = ? AND school_id = ?
+        ")->execute([$id, $schoolId]);
 
-        return $stmt->rowCount() > 0;
+            // Soft delete subcategories
+            $this->db->prepare("
+            UPDATE sub_categories 
+            SET is_active = 0 
+            WHERE category_id = ? AND school_id = ?
+        ")->execute([$id, $schoolId]);
+
+            $this->db->commit();
+
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function all(int $schoolId): array
@@ -66,7 +83,7 @@ class CategoryModel
 
     private function exists(int $schoolId, string $name, ?int $excludeId = null): bool
     {
-        $sql = "SELECT id FROM categories WHERE school_id=? AND name=?";
+        $sql = "SELECT id FROM categories WHERE school_id=? AND name=? AND is_active=1";
 
         if ($excludeId) {
             $sql .= " AND id != ?";
