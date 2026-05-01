@@ -35,7 +35,7 @@ class StockEntryController
 
         $data = json_decode(file_get_contents("php://input"), true);
 
-        if (empty($data['agency_id']) || empty($data['invoice_no']) || empty($data['items'])) {
+        if (empty($data['agency_id'])  || empty($data['items'])) {
             Response::json(["message" => "Required fields missing"], 422);
         }
 
