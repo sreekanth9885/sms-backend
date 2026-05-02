@@ -35,6 +35,13 @@ require_once __DIR__ . '/app/Controllers/SubCategoryController.php';
 require_once __DIR__ . '/app/Controllers/ProductController.php';
 require_once __DIR__ . '/app/Controllers/StockEntryController.php';
 require_once __DIR__ . '/app/Controllers/StoreDashboardController.php';
+require_once __DIR__ . '/app/Controllers/BranchController.php';
+require_once __DIR__ . '/app/Controllers/ProgramTypeController.php';
+require_once __DIR__ . '/app/Controllers/StoreClassController.php';
+require_once __DIR__ . '/app/Controllers/StoreSubjectController.php';
+require_once __DIR__ . '/app/Controllers/ProgramConfigController.php';
+require_once __DIR__ . '/app/Controllers/MaterialConfigController.php';
+require_once __DIR__ . '/app/Controllers/MaterialController.php';
 
 $router = new Router();
 
@@ -62,6 +69,13 @@ $subCategoryController = new SubCategoryController($pdo);
 $productController = new ProductController($pdo);
 $stockEntryController = new StockEntryController($pdo);
 $storeDashboardController = new StoreDashboardController($pdo);
+$branchController = new BranchController($pdo);
+$programTypeController = new ProgramTypeController($pdo);
+$storeClassController = new StoreClassController($pdo);
+$storeSubjectController = new StoreSubjectController($pdo);
+$programConfigController = new ProgramConfigController($pdo);
+$materialConfigController = new MaterialConfigController($pdo);
+$materialController = new MaterialController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -184,4 +198,43 @@ $router->delete('/stock-entries/{id}', [$stockEntryController, 'delete']);
 
 // Store Dashboard routes
 $router->get('/store-dashboard/stats', [$storeDashboardController, 'stats']);
+
+// Branch routes
+$router->post('/branches', [$branchController, 'create']);
+$router->get('/branches', [$branchController, 'index']);
+$router->put('/branches/{id}', [$branchController, 'update']);
+$router->delete('/branches/{id}', [$branchController, 'delete']);
+
+//program type routes
+$router->post('/program-types', [$programTypeController, 'create']);
+$router->get('/program-types', [$programTypeController, 'index']);
+$router->put('/program-types/{id}', [$programTypeController, 'update']);
+$router->delete('/program-types/{id}', [$programTypeController, 'delete']);
+
+//store class routes
+$router->get('/store-classes', [$storeClassController, 'index']);
+$router->post('/store-classes', [$storeClassController, 'create']);
+$router->put('/store-classes/{id}', [$storeClassController, 'update']);
+$router->delete('/store-classes/{id}', [$storeClassController, 'delete']);
+
+//store subject routes
+$router->get('/store-subjects', [$storeSubjectController, 'index']);
+$router->post('/store-subjects', [$storeSubjectController, 'create']);
+$router->put('/store-subjects/{id}', [$storeSubjectController, 'update']);
+$router->delete('/store-subjects/{id}', [$storeSubjectController, 'delete']);
+
+//program config routes
+$router->post('/program-config', [$programConfigController, 'save']);
+$router->get('/program-config', [$programConfigController, 'get']);
+
+//material config routes
+$router->post('/material-config', [$materialConfigController, 'save']);
+$router->get('/material-config', [$materialConfigController, 'get']);
+
+//material routes
+$router->post('/store-materials', [$materialController, 'create']);
+$router->get('/store-materials', [$materialController, 'index']);
+$router->put('/store-materials/{id}', [$materialController, 'update']);
+$router->delete('/store-materials/{id}', [$materialController, 'delete']);
+
 $router->dispatch();
