@@ -13,7 +13,7 @@ class ProgramConfigController
     }
 
     /**
-     * Save (Replace) Config
+     * Save (Replace) Config with quantity and price
      */
     public function save()
     {
@@ -33,10 +33,25 @@ class ProgramConfigController
             empty($data['branch_id']) ||
             empty($data['program_type_id']) ||
             empty($data['class_id']) ||
-            empty($data['subject_ids']) ||
-            !is_array($data['subject_ids'])
+            empty($data['subjects']) ||
+            !is_array($data['subjects'])
         ) {
-            Response::json(["message" => "Invalid input"], 422);
+            Response::json(["message" => "Invalid input. Required: branch_id, program_type_id, class_id, subjects array"], 422);
+        }
+
+        // Validate subjects array structure
+        foreach ($data['subjects'] as $subject) {
+            if (empty($subject['subject_id']) || !isset($subject['quantity']) || !isset($subject['price'])) {
+                Response::json(["message" => "Each subject must have subject_id, quantity, and price"], 422);
+            }
+
+            if ($subject['quantity'] <= 0) {
+                Response::json(["message" => "Quantity must be greater than 0"], 422);
+            }
+
+            if ($subject['price'] < 0) {
+                Response::json(["message" => "Price cannot be negative"], 422);
+            }
         }
 
         try {
@@ -45,10 +60,10 @@ class ProgramConfigController
                 (int)$data['branch_id'],
                 (int)$data['program_type_id'],
                 (int)$data['class_id'],
-                $data['subject_ids']
+                $data['subjects']
             );
 
-            Response::json(["message" => "Program config saved"]);
+            Response::json(["message" => "Program config saved successfully"]);
 
         } catch (Exception $e) {
             Response::json(["message" => $e->getMessage()], 500);
@@ -56,7 +71,7 @@ class ProgramConfigController
     }
 
     /**
-     * Get Config
+     * Get Config with quantity and price
      */
     public function get()
     {
@@ -71,10 +86,10 @@ class ProgramConfigController
         $classId = $_GET['class_id'] ?? null;
 
         if (!$branchId || !$programTypeId || !$classId) {
-            Response::json(["message" => "Missing parameters"], 422);
+            Response::json(["message" => "Missing parameters: branch_id, program_type_id, class_id"], 422);
         }
 
-        $data = $this->model->getSubjects(
+        $data = $this->model->getSubjectsWithDetails(
             (int)$user['school_id'],
             (int)$branchId,
             (int)$programTypeId,
