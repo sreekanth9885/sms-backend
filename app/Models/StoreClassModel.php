@@ -59,9 +59,9 @@ class StoreClassModel
     {
         $stmt = $this->db->prepare("
             SELECT id, name
-            FROM store_classes
-            WHERE school_id = ? AND is_active = 1
-            ORDER BY id DESC
+FROM store_classes
+WHERE school_id = ? AND is_active = 1
+ORDER BY CAST(SUBSTRING_INDEX(name, ' ', 1) AS UNSIGNED);
         ");
 
         $stmt->execute([$schoolId]);
