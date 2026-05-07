@@ -38,6 +38,7 @@ require_once __DIR__ . '/app/Controllers/StoreSubjectController.php';
 require_once __DIR__ . '/app/Controllers/ProgramConfigController.php';
 require_once __DIR__ . '/app/Controllers/MaterialConfigController.php';
 require_once __DIR__ . '/app/Controllers/MaterialController.php';
+require_once __DIR__ . '/app/Controllers/FirmController.php';
 
 $router = new Router();
 
@@ -68,6 +69,7 @@ $storeSubjectController = new StoreSubjectController($pdo);
 $programConfigController = new ProgramConfigController($pdo);
 $materialConfigController = new MaterialConfigController($pdo);
 $materialController = new MaterialController($pdo);
+$firmController = new FirmController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -204,5 +206,12 @@ $router->post('/store-materials', [$materialController, 'create']);
 $router->get('/store-materials', [$materialController, 'index']);
 $router->put('/store-materials/{id}', [$materialController, 'update']);
 $router->delete('/store-materials/{id}', [$materialController, 'delete']);
+
+//firm routes
+$router->post('/firms', [$firmController, 'create']);
+$router->get('/firms', [$firmController, 'getAll']);
+$router->get('/firms/{id}', [$firmController, 'getById']);
+$router->put('/firms/{id}', [$firmController, 'update']);
+$router->delete('/firms/{id}', [$firmController, 'delete']);
 
 $router->dispatch();
