@@ -17,6 +17,7 @@ class ProgramConfigModel
         int $branchId,
         int $programTypeId,
         int $classId,
+        ?int $agencyId,
         array $subjects
     ): bool {
 
@@ -39,12 +40,18 @@ class ProgramConfigModel
             // Step 2: insert new records with quantity and price
             $stmt = $this->db->prepare("
                 INSERT INTO store_program_config
-                (school_id, branch_id, program_type_id, class_id, subject_id, quantity, price, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-                ON DUPLICATE KEY UPDATE
-                quantity = VALUES(quantity),
-                price = VALUES(price),
-                is_active = 1
+(
+    school_id,
+    branch_id,
+    program_type_id,
+    class_id,
+    agency_id,
+    subject_id,
+    quantity,
+    price,
+    is_active
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
             ");
 
             foreach ($subjects as $subject) {
@@ -53,6 +60,7 @@ class ProgramConfigModel
                     $branchId,
                     $programTypeId,
                     $classId,
+                    $agencyId,
                     $subject['subject_id'],
                     $subject['quantity'],
                     $subject['price']
@@ -61,7 +69,6 @@ class ProgramConfigModel
 
             $this->db->commit();
             return true;
-
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e;
@@ -82,11 +89,14 @@ class ProgramConfigModel
             SELECT 
                 s.id,
                 s.name,
+                pc.agency_id,
+    a.name as agency_name,
                 pc.quantity,
                 pc.price,
                 (pc.quantity * pc.price) as total
             FROM store_program_config pc
             JOIN store_subjects s ON s.id = pc.subject_id
+            LEFT JOIN agencies a ON a.id = pc.agency_id
             WHERE pc.school_id = ?
             AND pc.branch_id = ?
             AND pc.program_type_id = ?
@@ -111,6 +121,8 @@ class ProgramConfigModel
             $formattedResults[] = [
                 'id' => (int)$row['id'],
                 'name' => $row['name'],
+                'agency_id' => $row['agency_id'] ? (int)$row['agency_id'] : null,
+                'agency_name' => $row['agency_name'],
                 'quantity' => (int)$row['quantity'],
                 'price' => (float)$row['price'],
                 'total' => (float)$row['total']
