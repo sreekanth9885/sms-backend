@@ -60,7 +60,6 @@ class ProgramConfigController
                 (int)$data['branch_id'],
                 (int)$data['program_type_id'],
                 (int)$data['class_id'],
-                isset($data['agency_id']) ? (int)$data['agency_id'] : null,
                 $data['subjects']
             );
 

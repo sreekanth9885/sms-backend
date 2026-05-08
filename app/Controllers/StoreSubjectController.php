@@ -29,11 +29,14 @@ class StoreSubjectController
         if (empty($data['name'])) {
             Response::json(["message" => "Subject name required"], 422);
         }
-
+        if (empty($data['agency_id'])) {
+            Response::json(["message" => "Agency ID required"], 422);
+        }
         try {
             $id = $this->model->create(
                 (int)$user['school_id'],
-                trim($data['name'])
+                trim($data['name']),
+                (int)$data['agency_id']
             );
 
             Response::json([
@@ -70,12 +73,14 @@ class StoreSubjectController
         if (!in_array($user['role'], ['ADMIN', 'SUPER_ADMIN', 'STORE_ADMIN'])) {
             Response::json(["message" => "Forbidden"], 403);
         }
-
+        $data = json_decode(file_get_contents("php://input"), true);
         if (!$id) {
             Response::json(["message" => "Subject ID required"], 422);
         }
+        if (empty($data['agency_id'])) {
+            Response::json(["message" => "Agency ID required"], 422);
+        }
 
-        $data = json_decode(file_get_contents("php://input"), true);
 
         if (empty($data['name'])) {
             Response::json(["message" => "Subject name required"], 422);
@@ -85,7 +90,8 @@ class StoreSubjectController
             $updated = $this->model->update(
                 (int)$id,
                 (int)$user['school_id'],
-                trim($data['name'])
+                trim($data['name']),
+                (int)$data['agency_id']
             );
 
             if (!$updated) {

@@ -17,7 +17,6 @@ class ProgramConfigModel
         int $branchId,
         int $programTypeId,
         int $classId,
-        ?int $agencyId,
         array $subjects
     ): bool {
 
@@ -45,13 +44,12 @@ class ProgramConfigModel
     branch_id,
     program_type_id,
     class_id,
-    agency_id,
     subject_id,
     quantity,
     price,
     is_active
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+VALUES (?, ?, ?, ?, ?, ?, ?, 1)
             ");
 
             foreach ($subjects as $subject) {
@@ -60,7 +58,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
                     $branchId,
                     $programTypeId,
                     $classId,
-                    $agencyId,
                     $subject['subject_id'],
                     $subject['quantity'],
                     $subject['price']
@@ -86,25 +83,28 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     ): array {
 
         $stmt = $this->db->prepare("
-            SELECT 
-                s.id,
-                s.name,
-                pc.agency_id,
-    a.name as agency_name,
-                pc.quantity,
-                pc.price,
-                (pc.quantity * pc.price) as total
-            FROM store_program_config pc
-            JOIN store_subjects s ON s.id = pc.subject_id
-            LEFT JOIN agencies a ON a.id = pc.agency_id
-            WHERE pc.school_id = ?
-            AND pc.branch_id = ?
-            AND pc.program_type_id = ?
-            AND pc.class_id = ?
-            AND pc.is_active = 1
-            AND s.is_active = 1
-            ORDER BY s.name ASC
-        ");
+    SELECT 
+        pc.id as config_id,
+    s.id as subject_id,
+        s.name,
+        s.agency_id,
+        a.name as agency_name,
+        pc.quantity,
+        pc.price,
+        (pc.quantity * pc.price) as total
+    FROM store_program_config pc
+    JOIN store_subjects s 
+        ON s.id = pc.subject_id
+    LEFT JOIN agencies a 
+        ON a.id = s.agency_id
+    WHERE pc.school_id = ?
+    AND pc.branch_id = ?
+    AND pc.program_type_id = ?
+    AND pc.class_id = ?
+    AND pc.is_active = 1
+    AND s.is_active = 1
+    ORDER BY s.name ASC
+");
 
         $stmt->execute([
             $schoolId,
@@ -115,13 +115,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
 
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Format the response
         $formattedResults = [];
+
         foreach ($results as $row) {
             $formattedResults[] = [
-                'id' => (int)$row['id'],
+                'config_id' => (int)$row['config_id'],
+                'subject_id' => (int)$row['subject_id'],
                 'name' => $row['name'],
-                'agency_id' => $row['agency_id'] ? (int)$row['agency_id'] : null,
+                'agency_id' => $row['agency_id']
+                    ? (int)$row['agency_id']
+                    : null,
                 'agency_name' => $row['agency_name'],
                 'quantity' => (int)$row['quantity'],
                 'price' => (float)$row['price'],
@@ -138,19 +141,22 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     public function getSubjectConfigById(int $configId): ?array
     {
         $stmt = $this->db->prepare("
-            SELECT 
-                pc.id,
-                pc.branch_id,
-                pc.program_type_id,
-                pc.class_id,
-                pc.subject_id,
-                pc.quantity,
-                pc.price,
-                s.name as subject_name
-            FROM store_program_config pc
-            JOIN store_subjects s ON s.id = pc.subject_id
-            WHERE pc.id = ? AND pc.is_active = 1
-        ");
+    SELECT 
+        pc.id,
+        pc.branch_id,
+        pc.program_type_id,
+        pc.class_id,
+        pc.subject_id,
+        pc.agency_id,
+        a.name as agency_name,
+        pc.quantity,
+        pc.price,
+        s.name as subject_name
+    FROM store_program_config pc
+    JOIN store_subjects s ON s.id = pc.subject_id
+    LEFT JOIN agencies a ON a.id = pc.agency_id
+    WHERE pc.id = ? AND pc.is_active = 1
+");
 
         $stmt->execute([$configId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -187,27 +193,30 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         int $offset = 0
     ): array {
         $sql = "
-            SELECT 
-                pc.id,
-                pc.branch_id,
-                b.name as branch_name,
-                pc.program_type_id,
-                pt.name as program_type_name,
-                pc.class_id,
-                c.name as class_name,
-                pc.subject_id,
-                s.name as subject_name,
-                pc.quantity,
-                pc.price,
-                (pc.quantity * pc.price) as total
-            FROM store_program_config pc
-            JOIN store_branches b ON b.id = pc.branch_id
-            JOIN store_program_types pt ON pt.id = pc.program_type_id
-            JOIN store_classes c ON c.id = pc.class_id
-            JOIN store_subjects s ON s.id = pc.subject_id
-            WHERE pc.school_id = ? 
-            AND pc.is_active = 1
-        ";
+    SELECT 
+        pc.id,
+        pc.branch_id,
+        b.name as branch_name,
+        pc.program_type_id,
+        pt.name as program_type_name,
+        pc.class_id,
+        c.name as class_name,
+        pc.subject_id,
+        s.name as subject_name,
+        pc.agency_id,
+        a.name as agency_name,
+        pc.quantity,
+        pc.price,
+        (pc.quantity * pc.price) as total
+    FROM store_program_config pc
+    JOIN store_branches b ON b.id = pc.branch_id
+    JOIN store_program_types pt ON pt.id = pc.program_type_id
+    JOIN store_classes c ON c.id = pc.class_id
+    JOIN store_subjects s ON s.id = pc.subject_id
+    LEFT JOIN agencies a ON a.id = pc.agency_id
+    WHERE pc.school_id = ? 
+    AND pc.is_active = 1
+";
 
         $params = [$schoolId];
 
