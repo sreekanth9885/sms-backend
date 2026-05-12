@@ -39,6 +39,10 @@ require_once __DIR__ . '/app/Controllers/ProgramConfigController.php';
 require_once __DIR__ . '/app/Controllers/MaterialConfigController.php';
 require_once __DIR__ . '/app/Controllers/MaterialController.php';
 require_once __DIR__ . '/app/Controllers/FirmController.php';
+require_once __DIR__ . '/app/Controllers/CategoryController.php';
+require_once __DIR__ . '/app/Controllers/SubCategoryController.php';
+require_once __DIR__ . '/app/Controllers/ProductController.php';
+require_once __DIR__ . '/app/Controllers/StockEntryController.php';
 
 $router = new Router();
 
@@ -70,6 +74,10 @@ $programConfigController = new ProgramConfigController($pdo);
 $materialConfigController = new MaterialConfigController($pdo);
 $materialController = new MaterialController($pdo);
 $firmController = new FirmController($pdo);
+$categoryController = new CategoryController($pdo);
+$subCategoryController = new SubCategoryController($pdo);
+$productController = new ProductController($pdo);
+$stockEntryController = new StockEntryController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -213,5 +221,29 @@ $router->get('/firms', [$firmController, 'getAll']);
 $router->get('/firms/{id}', [$firmController, 'getById']);
 $router->put('/firms/{id}', [$firmController, 'update']);
 $router->delete('/firms/{id}', [$firmController, 'delete']);
+// Category routes
+$router->post('/categories', [$categoryController, 'create']);
+$router->get('/categories', [$categoryController, 'index']);
+$router->put('/categories/{id}', [$categoryController, 'update']);
+$router->delete('/categories/{id}', [$categoryController, 'delete']);
+
+// SubCategory routes
+$router->post('/sub-categories', [$subCategoryController, 'create']);
+$router->get('/sub-categories', [$subCategoryController, 'index']);
+$router->put('/sub-categories/{id}', [$subCategoryController, 'update']);
+$router->delete('/sub-categories/{id}', [$subCategoryController, 'delete']);
+
+// Product routes
+$router->post('/products', [$productController, 'create']);
+$router->get('/products', [$productController, 'index']);
+$router->put('/products/{id}', [$productController, 'update']);
+$router->delete('/products/{id}', [$productController, 'delete']);
+
+// Stock Entry routes
+$router->post('/stock-entries', [$stockEntryController, 'create']);
+$router->get('/stock-entries', [$stockEntryController, 'index']);
+$router->put('/stock-entries/{id}', [$stockEntryController, 'update']);
+$router->delete('/stock-entries/{id}', [$stockEntryController, 'delete']);
+
 
 $router->dispatch();
