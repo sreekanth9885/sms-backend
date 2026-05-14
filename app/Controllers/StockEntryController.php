@@ -17,7 +17,7 @@ class StockEntryController
         Response::json(["message" => "School context missing"], 403);
     }
 
-    $data = $this->model->allBySchool($user['school_id']);
+        $data = $this->model->all($user['school_id']);
 
     Response::json(["data" => $data]);
 }
