@@ -108,79 +108,246 @@ class StockEntryModel
 
         try {
 
-            $total = 0;
+            // =========================
+            // 1. CALCULATE TOTAL
+            // =========================
+
+            $grandTotal = 0;
 
             foreach ($data['items'] as $item) {
-                $total += $item['quantity'] * $item['price'];
+
+                $grandTotal += (
+                    $item['quantity'] * $item['price']
+                );
             }
 
-            $stmt = $this->db->prepare("
-                INSERT INTO stock_entries
-                (
-                    school_id,
-                    agency_id,
-                    invoice_no,
-                    invoice_date,
-                    total_amount,
-                    notes,
-                    created_by,
-                    is_active
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-            ");
+            // =========================
+            // 2. CREATE STOCK ENTRY
+            // =========================
 
-            $stmt->execute([
+            $entryStmt = $this->db->prepare("
+            INSERT INTO stock_entries
+            (
+                school_id,
+                agency_id,
+                invoice_no,
+                invoice_date,
+                total_amount,
+                notes,
+                created_by,
+                is_active
+            )
+            VALUES
+            (?, ?, ?, ?, ?, ?, ?, 1)
+        ");
+
+            $entryStmt->execute([
                 $schoolId,
                 $data['agency_id'],
                 $data['invoice_no'],
                 $data['invoice_date'],
-                $total,
+                $grandTotal,
                 $data['notes'] ?? null,
                 $userId
             ]);
 
             $stockEntryId = $this->db->lastInsertId();
 
+            // =========================
+            // 3. PROCESS ITEMS
+            // =========================
+
             foreach ($data['items'] as $item) {
 
-                $itemTotal = $item['quantity'] * $item['price'];
+                $productId = $item['product_id'];
+                $qty       = $item['quantity'];
+                $rate      = $item['price'];
+
+                $itemTotal = $qty * $rate;
+
+                // =========================
+                // 4. GET PRODUCT DETAILS
+                // =========================
+
+                $productStmt = $this->db->prepare("
+                SELECT
+                    id,
+                    category_id,
+                    sub_category_id
+                FROM products
+                WHERE id = ?
+                  AND school_id = ?
+            ");
+
+                $productStmt->execute([
+                    $productId,
+                    $schoolId
+                ]);
+
+                $product = $productStmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$product) {
+                    throw new Exception("Invalid product");
+                }
+
+                // =========================
+                // 5. INSERT ENTRY ITEM
+                // =========================
 
                 $itemStmt = $this->db->prepare("
-                    INSERT INTO stock_entry_items
-                    (
-                        stock_entry_id,
-                        product_id,
-                        quantity,
-                        price,
-                        total,
-                        is_active
-                    )
-                    VALUES (?, ?, ?, ?, ?, 1)
-                ");
+                INSERT INTO stock_entry_items
+                (
+                    stock_entry_id,
+                    product_id,
+                    quantity,
+                    price,
+                    total,
+                    is_active
+                )
+                VALUES
+                (?, ?, ?, ?, ?, 1)
+            ");
 
                 $itemStmt->execute([
                     $stockEntryId,
-                    $item['product_id'],
-                    $item['quantity'],
-                    $item['price'],
+                    $productId,
+                    $qty,
+                    $rate,
                     $itemTotal
                 ]);
 
-                // Update stock
+                // =========================
+                // 6. INSERT STOCK TRANSACTION
+                // =========================
+
+                $transactionStmt = $this->db->prepare("
+                INSERT INTO stock_transactions
+                (
+                    school_id,
+                    reference_type,
+                    reference_id,
+                    transaction_type,
+                    product_id,
+                    quantity,
+                    rate,
+                    total,
+                    created_by
+                )
+                VALUES
+                (?, 'PURCHASE', ?, 'IN', ?, ?, ?, ?, ?)
+            ");
+
+                $transactionStmt->execute([
+                    $schoolId,
+                    $stockEntryId,
+                    $productId,
+                    $qty,
+                    $rate,
+                    $itemTotal,
+                    $userId
+                ]);
+
+                // =========================
+                // 7. UPDATE LAST PURCHASE RATE
+                // =========================
+
+                $lastRateStmt = $this->db->prepare("
+                UPDATE products
+                SET last_purchase_rate = ?
+                WHERE id = ?
+            ");
+
+                $lastRateStmt->execute([
+                    $rate,
+                    $productId
+                ]);
+
+                // =========================
+                // 8. CHECK STORE STOCK
+                // =========================
 
                 $stockStmt = $this->db->prepare("
-                    UPDATE products
-                    SET quantity = quantity + ?
-                    WHERE id = ?
-                      AND school_id = ?
-                ");
+                SELECT *
+                FROM store_stock
+                WHERE school_id = ?
+                  AND product_id = ?
+            ");
 
                 $stockStmt->execute([
-                    $item['quantity'],
-                    $item['product_id'],
-                    $schoolId
+                    $schoolId,
+                    $productId
+                ]);
+
+                $existingStock = $stockStmt->fetch(PDO::FETCH_ASSOC);
+
+                // =========================
+                // 9. UPDATE EXISTING STOCK
+                // =========================
+
+                if ($existingStock) {
+
+                    $oldQty   = $existingStock['quantity'];
+                    $oldValue = $existingStock['total_value'];
+
+                    $newQty = $oldQty + $qty;
+
+                    $newValue = $oldValue + $itemTotal;
+
+                    $avgRate = $newValue / $newQty;
+
+                    $updateStockStmt = $this->db->prepare("
+                    UPDATE store_stock
+                    SET
+                        quantity = ?,
+                        avg_rate = ?,
+                        last_purchase_rate = ?,
+                        total_value = ?
+                    WHERE id = ?
+                ");
+
+                    $updateStockStmt->execute([
+                        $newQty,
+                        $avgRate,
+                        $rate,
+                        $newValue,
+                        $existingStock['id']
+                    ]);
+                }
+
+                // =========================
+                // 10. INSERT NEW STOCK
+                // =========================
+
+                else {
+
+                    $insertStockStmt = $this->db->prepare("
+                    INSERT INTO store_stock
+                    (
+                        school_id,
+                        product_id,
+                        quantity,
+                        avg_rate,
+                        last_purchase_rate,
+                        total_value
+                    )
+                    VALUES
+                    (?, ?, ?, ?, ?, ?)
+                ");
+
+                    $insertStockStmt->execute([
+                        $schoolId,
+                        $productId,
+                        $qty,
+                        $rate,
+                        $rate,
+                        $itemTotal
                 ]);
             }
+            }
+
+            // =========================
+            // 11. COMMIT
+            // =========================
 
             $this->db->commit();
 

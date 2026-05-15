@@ -82,12 +82,27 @@ class SubCategoryController
     {
         $user = JwtHelper::getUserFromToken();
 
-        $deleted = $this->model->delete((int)$id, (int)$user['school_id']);
+        try {
+
+            $deleted = $this->model->delete(
+                (int)$id,
+                (int)$user['school_id']
+            );
 
         if (!$deleted) {
-            Response::json(["message" => "Not found"], 404);
+                Response::json([
+                    "message" => "Subcategory not found"
+                ], 404);
         }
 
-        Response::json(["message" => "Subcategory deleted"]);
+            Response::json([
+                "message" => "Subcategory deleted"
+            ]);
+        } catch (Exception $e) {
+
+            Response::json([
+                "message" => $e->getMessage()
+            ], 409);
+        }
     }
 }

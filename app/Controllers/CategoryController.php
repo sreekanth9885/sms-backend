@@ -77,12 +77,27 @@ class CategoryController
     {
         $user = JwtHelper::getUserFromToken();
 
-        $deleted = $this->model->delete((int)$id, (int)$user['school_id']);
+        try {
+
+            $deleted = $this->model->delete(
+                (int)$id,
+                (int)$user['school_id']
+            );
 
         if (!$deleted) {
-            Response::json(["message" => "Not found"], 404);
+                Response::json([
+                    "message" => "Category not found"
+                ], 404);
         }
 
-        Response::json(["message" => "Category deleted"]);
+            Response::json([
+                "message" => "Category deleted"
+            ]);
+        } catch (Exception $e) {
+
+            Response::json([
+                "message" => $e->getMessage()
+            ], 409);
+        }
     }
 }

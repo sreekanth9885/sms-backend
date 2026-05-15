@@ -43,15 +43,61 @@ class SubCategoryModel
 
     public function delete(int $id, int $schoolId): bool
     {
-        $stmt = $this->db->prepare("
-        UPDATE sub_categories 
-        SET is_active = 0 
-        WHERE id = ? AND school_id = ?
-    ");
+        try {
 
-        $stmt->execute([$id, $schoolId]);
+            $this->db->beginTransaction();
+
+            // =====================================
+            // CHECK PRODUCTS EXIST
+            // =====================================
+
+            $productStmt = $this->db->prepare("
+            SELECT COUNT(*) as total
+            FROM products
+            WHERE sub_category_id = ?
+              AND school_id = ?
+              AND is_active = 1
+        ");
+
+            $productStmt->execute([
+                $id,
+                $schoolId
+            ]);
+
+            $productCount = $productStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($productCount['total'] > 0) {
+
+                throw new Exception(
+                    "Cannot delete subcategory. Products are linked."
+                );
+            }
+
+            // =====================================
+            // SOFT DELETE SUB CATEGORY
+            // =====================================
+
+            $stmt = $this->db->prepare("
+            UPDATE sub_categories
+            SET is_active = 0
+            WHERE id = ?
+              AND school_id = ?
+        ");
+
+            $stmt->execute([
+                $id,
+                $schoolId
+            ]);
+
+            $this->db->commit();
 
         return $stmt->rowCount() > 0;
+        } catch (Exception $e) {
+
+            $this->db->rollBack();
+
+            throw $e;
+        }
     }
 
     public function all(int $schoolId): array

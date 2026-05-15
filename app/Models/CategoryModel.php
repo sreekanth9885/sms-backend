@@ -43,27 +43,74 @@ class CategoryModel
     public function delete(int $id, int $schoolId): bool
     {
         try {
+
             $this->db->beginTransaction();
 
-            // Soft delete category
-            $this->db->prepare("
-            UPDATE categories 
-            SET is_active = 0 
-            WHERE id = ? AND school_id = ?
-        ")->execute([$id, $schoolId]);
+            // =====================================
+            // CHECK PRODUCTS EXIST
+            // =====================================
 
-            // Soft delete subcategories
-            $this->db->prepare("
-            UPDATE sub_categories 
-            SET is_active = 0 
-            WHERE category_id = ? AND school_id = ?
-        ")->execute([$id, $schoolId]);
+            $productStmt = $this->db->prepare("
+            SELECT COUNT(*) as total
+            FROM products
+            WHERE category_id = ?
+              AND school_id = ?
+              AND is_active = 1
+        ");
+
+            $productStmt->execute([
+                $id,
+                $schoolId
+            ]);
+
+            $productCount = $productStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($productCount['total'] > 0) {
+
+                throw new Exception(
+                    "Cannot delete category. Products are linked."
+                );
+            }
+
+            // =====================================
+            // SOFT DELETE CATEGORY
+            // =====================================
+
+            $categoryStmt = $this->db->prepare("
+            UPDATE categories
+            SET is_active = 0
+            WHERE id = ?
+              AND school_id = ?
+        ");
+
+            $categoryStmt->execute([
+                $id,
+                $schoolId
+            ]);
+
+            // =====================================
+            // SOFT DELETE SUB CATEGORIES
+            // =====================================
+
+            $subStmt = $this->db->prepare("
+            UPDATE sub_categories
+            SET is_active = 0
+            WHERE category_id = ?
+              AND school_id = ?
+        ");
+
+            $subStmt->execute([
+                $id,
+                $schoolId
+            ]);
 
             $this->db->commit();
 
-            return true;
+            return $categoryStmt->rowCount() > 0;
         } catch (Exception $e) {
+
             $this->db->rollBack();
+
             throw $e;
         }
     }
