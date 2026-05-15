@@ -44,6 +44,7 @@ require_once __DIR__ . '/app/Controllers/SubCategoryController.php';
 require_once __DIR__ . '/app/Controllers/ProductController.php';
 require_once __DIR__ . '/app/Controllers/StockEntryController.php';
 require_once __DIR__ . '/app/Controllers/StoreStockController.php';
+require_once __DIR__ . '/app/Controllers/AgencyStatementController.php';
 
 $router = new Router();
 
@@ -80,6 +81,7 @@ $subCategoryController = new SubCategoryController($pdo);
 $productController = new ProductController($pdo);
 $stockEntryController = new StockEntryController($pdo);
 $storeStockController = new StoreStockController($pdo);
+$agencyStatementController = new AgencyStatementController($pdo);
 
 $router->post('/auth/login', [$authController, 'login']);
 $router->get('/auth/me', [$authController, 'me']);
@@ -251,5 +253,6 @@ $router->get('/stocks', [$storeStockController, 'index']);
 
 $router->get('/stocks/{id}', [$storeStockController, 'show']);
 
+$router->get('/agency-statements', [$agencyStatementController, 'index']);
 
 $router->dispatch();
