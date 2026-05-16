@@ -58,9 +58,29 @@ class ProductController
     {
         $user = JwtHelper::getUserFromToken();
 
-        $data = $this->model->all((int)$user['school_id']);
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = max(1, (int)($_GET['limit'] ?? 20));
 
-        Response::json(["data" => $data]);
+        $search = trim($_GET['search'] ?? '');
+
+        $categoryId = isset($_GET['category_id'])
+            ? (int)$_GET['category_id']
+            : null;
+
+        $subCategoryId = isset($_GET['sub_category_id'])
+            ? (int)$_GET['sub_category_id']
+            : null;
+
+        $result = $this->model->all(
+            schoolId: (int)$user['school_id'],
+            page: $page,
+            limit: $limit,
+            search: $search,
+            categoryId: $categoryId,
+            subCategoryId: $subCategoryId
+        );
+
+        Response::json($result);
     }
 
     public function update($id)
@@ -114,5 +134,20 @@ class ProductController
         }
 
         Response::json(["message" => "Product deleted"]);
+    }
+    public function search()
+    {
+        $user = JwtHelper::getUserFromToken();
+
+        $query = trim($_GET['q'] ?? '');
+
+        $data = $this->model->searchProducts(
+            (int)$user['school_id'],
+            $query
+        );
+
+        Response::json([
+            "data" => $data
+        ]);
     }
 }

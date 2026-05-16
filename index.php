@@ -242,7 +242,7 @@ $router->post('/products', [$productController, 'create']);
 $router->get('/products', [$productController, 'index']);
 $router->put('/products/{id}', [$productController, 'update']);
 $router->delete('/products/{id}', [$productController, 'delete']);
-
+$router->get('/products/search', [$productController, 'search']);
 // Stock Entry routes
 $router->post('/stock-entries', [$stockEntryController, 'create']);
 $router->get('/stock-entries', [$stockEntryController, 'index']);

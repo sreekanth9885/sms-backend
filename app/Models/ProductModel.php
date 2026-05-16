@@ -84,9 +84,74 @@ class ProductModel
         return $stmt->rowCount() > 0;
     }
 
-    public function all(int $schoolId): array
-    {
-        $stmt = $this->db->prepare("
+    public function all(
+        int $schoolId,
+        int $page = 1,
+        int $limit = 20,
+        string $search = '',
+        ?int $categoryId = null,
+        ?int $subCategoryId = null
+    ): array {
+
+        $offset = ($page - 1) * $limit;
+
+        $where = "
+        WHERE p.school_id = :school_id
+        AND p.is_active = 1
+        AND c.is_active = 1
+        AND sc.is_active = 1
+    ";
+
+        $params = [
+            ':school_id' => $schoolId
+        ];
+
+        // SEARCH
+        if (!empty($search)) {
+            $where .= "
+            AND (
+                p.name LIKE :search
+                OR c.name LIKE :search
+                OR sc.name LIKE :search
+            )
+        ";
+
+            $params[':search'] = "%{$search}%";
+        }
+
+        // CATEGORY FILTER
+        if (!empty($categoryId)) {
+            $where .= " AND p.category_id = :category_id ";
+            $params[':category_id'] = $categoryId;
+        }
+
+        // SUB CATEGORY FILTER
+        if (!empty($subCategoryId)) {
+            $where .= " AND p.sub_category_id = :sub_category_id ";
+            $params[':sub_category_id'] = $subCategoryId;
+        }
+
+        // TOTAL COUNT QUERY
+        $countSql = "
+        SELECT COUNT(*) as total
+        FROM products p
+        JOIN categories c ON c.id = p.category_id
+        JOIN sub_categories sc ON sc.id = p.sub_category_id
+        $where
+    ";
+
+        $countStmt = $this->db->prepare($countSql);
+
+        foreach ($params as $key => $value) {
+            $countStmt->bindValue($key, $value);
+        }
+
+        $countStmt->execute();
+
+        $total = (int)$countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+
+        // DATA QUERY
+        $sql = "
         SELECT 
             p.id,
             p.name,
@@ -99,16 +164,33 @@ class ProductModel
         FROM products p
         JOIN categories c ON c.id = p.category_id
         JOIN sub_categories sc ON sc.id = p.sub_category_id
-        WHERE p.school_id=? 
-        AND p.is_active=1
-        AND c.is_active=1
-        AND sc.is_active=1
+        $where
         ORDER BY p.id DESC
-    ");
+        LIMIT :limit OFFSET :offset
+    ";
 
-        $stmt->execute([$schoolId]);
+        $stmt = $this->db->prepare($sql);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            "data" => $data,
+            "pagination" => [
+                "total" => $total,
+                "page" => $page,
+                "limit" => $limit,
+                "total_pages" => ceil($total / $limit)
+            ]
+        ];
     }
 
     private function exists(
@@ -140,5 +222,42 @@ class ProductModel
         $stmt->execute($params);
 
         return (bool)$stmt->fetch();
+    }
+    public function searchProducts(
+        int $schoolId,
+        string $search
+    ): array {
+
+        $stmt = $this->db->prepare("
+        SELECT
+            p.id,
+            p.name,
+            p.unit,
+            c.name AS category_name,
+            sc.name AS sub_category_name
+        FROM products p
+        JOIN categories c ON c.id = p.category_id
+        JOIN sub_categories sc ON sc.id = p.sub_category_id
+        WHERE p.school_id = ?
+        AND p.is_active = 1
+        AND (
+            p.name LIKE ?
+            OR c.name LIKE ?
+            OR sc.name LIKE ?
+        )
+        ORDER BY p.name ASC
+        LIMIT 20
+    ");
+
+        $searchTerm = "%{$search}%";
+
+        $stmt->execute([
+            $schoolId,
+            $searchTerm,
+            $searchTerm,
+            $searchTerm
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
