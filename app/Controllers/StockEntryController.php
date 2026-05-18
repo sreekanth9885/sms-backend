@@ -52,7 +52,23 @@ class StockEntryController
             ], 201);
 
         } catch (Exception $e) {
-            Response::json(["message" => $e->getMessage()], 409);
+
+            $message = $e->getMessage();
+
+            // Duplicate invoice error
+            if (
+                str_contains($message, 'Duplicate entry') &&
+                str_contains($message, 'unique_invoice')
+            ) {
+
+                Response::json([
+                    "message" => "This invoice number already exists for this agency."
+                ], 409);
+            }
+
+            Response::json([
+                "message" => $message
+            ], 409);
         }
     }
     public function delete($id)

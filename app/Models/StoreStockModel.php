@@ -152,6 +152,7 @@ class StoreStockModel
 
             WHERE st.school_id = ?
               AND st.product_id = ?
+              AND st.is_active = 1
 
             ORDER BY st.id DESC
         ");

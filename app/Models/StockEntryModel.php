@@ -63,7 +63,7 @@ class StockEntryModel
             $itemsStmt->execute([$entry['id']]);
 
             $entry['items'] = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+        }
 
         return $entries;
     }
@@ -341,8 +341,8 @@ class StockEntryModel
                         $rate,
                         $rate,
                         $itemTotal
-                ]);
-            }
+                    ]);
+                }
             }
 
             // =========================
@@ -489,42 +489,128 @@ class StockEntryModel
 
         try {
 
+            // =========================
+            // GET ACTIVE ENTRY ITEMS
+            // =========================
+
             $itemsStmt = $this->db->prepare("
-                SELECT *
-                FROM stock_entry_items
-                WHERE stock_entry_id = ?
-            ");
+            SELECT *
+            FROM stock_entry_items
+            WHERE stock_entry_id = ?
+              AND is_active = 1
+        ");
 
             $itemsStmt->execute([$id]);
 
             $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // =========================
+            // REVERSE STORE STOCK
+            // =========================
+
             foreach ($items as $item) {
 
-                $this->db->prepare("
-                    UPDATE products
-                    SET quantity = quantity - ?
-                    WHERE id = ?
-                      AND school_id = ?
-                ")->execute([
-                    $item['quantity'],
-                    $item['product_id'],
-                    $schoolId
+                $stockStmt = $this->db->prepare("
+                SELECT *
+                FROM store_stock
+                WHERE school_id = ?
+                  AND product_id = ?
+            ");
+
+                $stockStmt->execute([
+                    $schoolId,
+                    $item['product_id']
+                ]);
+
+                $stock = $stockStmt->fetch(PDO::FETCH_ASSOC);
+
+                // Skip if stock not found
+                if (!$stock) {
+                    continue;
+                }
+
+                // =========================
+                // CALCULATE NEW VALUES
+                // =========================
+
+                $newQty = $stock['quantity'] - $item['quantity'];
+
+                $newValue = $stock['total_value'] - $item['total'];
+
+                // Prevent negative values
+                if ($newQty < 0) {
+                    $newQty = 0;
+                }
+
+                if ($newValue < 0) {
+                    $newValue = 0;
+                }
+
+                // =========================
+                // RECALCULATE AVG RATE
+                // =========================
+
+                $newAvgRate = $newQty > 0
+                    ? $newValue / $newQty
+                    : 0;
+
+                // =========================
+                // UPDATE STORE STOCK
+                // =========================
+
+                $updateStockStmt = $this->db->prepare("
+                UPDATE store_stock
+                SET
+                    quantity = ?,
+                    avg_rate = ?,
+                    total_value = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+
+                $updateStockStmt->execute([
+                    $newQty,
+                    $newAvgRate,
+                    $newValue,
+                    $stock['id']
                 ]);
             }
 
-            $this->db->prepare("
-                UPDATE stock_entry_items
-                SET is_active = 0
-                WHERE stock_entry_id = ?
-            ")->execute([$id]);
+            // =========================
+            // SOFT DELETE STOCK TRANSACTIONS
+            // =========================
 
             $this->db->prepare("
-                UPDATE stock_entries
-                SET is_active = 0
-                WHERE id = ?
-                  AND school_id = ?
-            ")->execute([$id, $schoolId]);
+            UPDATE stock_transactions
+            SET is_active = 0
+            WHERE reference_type = 'PURCHASE'
+              AND reference_id = ?
+        ")->execute([$id]);
+
+            // =========================
+            // SOFT DELETE ENTRY ITEMS
+            // =========================
+
+            $this->db->prepare("
+            UPDATE stock_entry_items
+            SET is_active = 0
+            WHERE stock_entry_id = ?
+        ")->execute([$id]);
+
+            // =========================
+            // SOFT DELETE STOCK ENTRY
+            // =========================
+
+            $this->db->prepare("
+            UPDATE stock_entries
+            SET is_active = 0
+            WHERE id = ?
+              AND school_id = ?
+        ")->execute([$id, $schoolId]);
+
+            // =========================
+            // COMMIT
+            // =========================
 
             $this->db->commit();
 
