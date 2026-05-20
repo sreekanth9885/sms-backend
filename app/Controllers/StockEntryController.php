@@ -1,109 +1,108 @@
 <?php
-require_once __DIR__ . '/../Models/StockEntryModel.php';
-require_once __DIR__ . '/../Helpers/JwtHelper.php';
+
+require_once __DIR__ . '/../services/StockEntryService.php';
+
 class StockEntryController
 {
-    private $model;
+    private $service;
 
     public function __construct(PDO $db)
     {
-        $this->model = new StockEntryModel($db);
+        $this->service = new StockEntryService($db);
     }
+
     public function index()
-{
-    $user = JwtHelper::getUserFromToken();
+    {
+        try {
 
-    if (!isset($user['school_id'])) {
-        Response::json(["message" => "School context missing"], 403);
+            $user = JwtHelper::getUserFromToken();
+
+            $data = $this->service->all($user);
+
+            Response::json([
+                "data" => $data
+            ]);
+        } catch (Exception $e) {
+
+            Response::json([
+                "message" => $e->getMessage()
+            ], 422);
+        }
     }
 
-        $data = $this->model->all($user['school_id']);
-
-    Response::json(["data" => $data]);
-}
     public function create()
     {
-        $user = JwtHelper::getUserFromToken();
+        $this->handle(function () {
 
-        if (!isset($user['school_id'])) {
-            Response::json(["message" => "School context missing"], 403);
-        }
+            $user = JwtHelper::getUserFromToken();
 
-        if (!in_array($user['role'], ['ADMIN', 'STORE_ADMIN'])) {
-            Response::json(["message" => "Forbidden"], 403);
-        }
+            $data = json_decode(
+                file_get_contents("php://input"),
+                true
+            );
 
-        $data = json_decode(file_get_contents("php://input"), true);
-
-        if (empty($data['agency_id'])  || empty($data['items'])) {
-            Response::json(["message" => "Required fields missing"], 422);
-        }
-
-        try {
-            $id = $this->model->create(
-                $user['school_id'],
+            $id = $this->service->create(
                 $data,
-                $user['id']
+                $user
             );
 
             Response::json([
-                "message" => "Stock entry created",
+                "message" => "Created successfully",
                 "id" => $id
             ], 201);
+        });
+    }
 
-        } catch (Exception $e) {
+    public function update($id)
+    {
+        $this->handle(function () use ($id) {
 
-            $message = $e->getMessage();
+            $user = JwtHelper::getUserFromToken();
 
-            // Duplicate invoice error
-            if (
-                str_contains($message, 'Duplicate entry') &&
-                str_contains($message, 'unique_invoice')
-            ) {
+            $data = json_decode(
+                file_get_contents("php://input"),
+                true
+            );
 
-                Response::json([
-                    "message" => "This invoice number already exists for this agency."
-                ], 409);
-            }
+            $this->service->update(
+                $id,
+                $data,
+                $user
+            );
 
             Response::json([
-                "message" => $message
-            ], 409);
+                "message" => "Updated successfully"
+            ]);
+        });
+    }
+
+    public function delete($id)
+    {
+        $this->handle(function () use ($id) {
+
+            $user = JwtHelper::getUserFromToken();
+
+            $this->service->delete(
+                $id,
+                $user
+            );
+
+            Response::json([
+                "message" => "Deleted successfully"
+            ]);
+        });
+    }
+
+    private function handle($callback)
+    {
+        try {
+
+            $callback();
+        } catch (Exception $e) {
+
+            Response::json([
+                "message" => $e->getMessage()
+            ], 422);
         }
     }
-    public function delete($id)
-{
-    $user = JwtHelper::getUserFromToken();
-
-    if (!in_array($user['role'], ['ADMIN', 'STORE_ADMIN'])) {
-        Response::json(["message" => "Forbidden"], 403);
-    }
-
-    $deleted = $this->model->delete($id, $user['school_id']);
-
-    if (!$deleted) {
-        Response::json(["message" => "Not found"], 404);
-    }
-
-    Response::json(["message" => "Deleted successfully"]);
-}
-public function update($id)
-{
-    $user = JwtHelper::getUserFromToken();
-
-    if (!in_array($user['role'], ['ADMIN', 'STORE_ADMIN'])) {
-        Response::json(["message" => "Forbidden"], 403);
-    }
-
-    $data = json_decode(file_get_contents("php://input"), true);
-
-    try {
-        $this->model->update($id, $user['school_id'], $data, $user['id']);
-
-        Response::json(["message" => "Updated successfully"]);
-
-    } catch (Exception $e) {
-        Response::json(["message" => $e->getMessage()], 409);
-    }
-}
 }

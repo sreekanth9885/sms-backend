@@ -52,6 +52,7 @@ class StoreStockModel
               AND p.is_active = 1
               AND c.is_active = 1
               AND sc.is_active = 1
+              AND ss.quantity > 0
 
             ORDER BY p.name ASC
         ");
@@ -105,6 +106,7 @@ class StoreStockModel
               AND p.is_active = 1
               AND c.is_active = 1
               AND sc.is_active = 1
+              AND ss.quantity > 0
         ");
 
         $stmt->execute([
