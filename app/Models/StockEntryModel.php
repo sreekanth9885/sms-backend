@@ -99,6 +99,7 @@ class StockEntryModel
                 total_amount = ?,
                 notes = ?
             WHERE id = ?
+            AND school_id = ?
               AND is_active = 1
         ");
 
